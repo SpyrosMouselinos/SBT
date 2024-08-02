@@ -88,7 +88,9 @@ class AutomateParameterSelection:
         This function takes a DataFrame and adds a new column named 'Date'. The
         'Date' column is constructed by formatting the start and end dates from
         the existing 'date_start' and 'date_end' columns. The format used is
-        'MM-YYYY to MM-YYYY'.
+        'MM-YYYY to MM-YYYY'. This allows for a clear representation of the date
+        range directly within the DataFrame, making it easier to analyze and
+        visualize date-related data.
 
         Args:
             df (pandas.DataFrame): The input DataFrame containing 'date_start'
@@ -417,8 +419,9 @@ class AutomateParameterSelectionXbtusd(AutomateParameterSelection):
 
         Args:
             df (pd.DataFrame): A DataFrame containing financial data with columns such as 'Date',
-                'Estimated PNL with Funding',
-                'Funding in Total', 'Sharpe Ratio', and other relevant metrics.
+                'Estimated PNL with Funding', 'Funding in Total', 'Sharpe Ratio', and
+                other
+                relevant metrics.
 
         Returns:
             pd.DataFrame: A new DataFrame containing combined results, with columns for each
@@ -595,7 +598,8 @@ class AutomateParameterSelectionEthusdMultiperiod(AutomateParameterSelection):
         This method takes a list of sweep IDs, downloads the corresponding sweep
         results for each ID, adds a date column to each DataFrame, and
         concatenates them into a single DataFrame. The resulting DataFrame is
-        reset to have a clean index.
+        reset to have a clean index. This is useful for aggregating results from
+        multiple sweeps into a unified format for further analysis or reporting.
 
         Args:
             sweep_id_confirm (list): A list of sweep IDs to download results for.
@@ -630,8 +634,7 @@ class AutomateParameterSelectionEthusdMultiperiod(AutomateParameterSelection):
 
         Returns:
             pd.DataFrame: A new DataFrame containing combined results with metrics organized by
-                date
-                and additional parameters if present.
+                date and additional parameters if present.
         """
 
         param_list = self.ethusd_params_list()
@@ -774,7 +777,8 @@ class AutomateParameterSelectionEthusdMultiperiod(AutomateParameterSelection):
         then iterates through the rows of `df_conf`, finding corresponding rows
         in `df_multi` based on a specified tolerance for parameter differences.
         The results are compiled into a new DataFrame that includes the relevant
-        columns from both input DataFrames.
+        columns from both input DataFrames, while also ensuring that rows with
+        all NaN values are removed from the final output.
 
         Args:
             df_multi (pd.DataFrame): The first DataFrame containing multiple results.
