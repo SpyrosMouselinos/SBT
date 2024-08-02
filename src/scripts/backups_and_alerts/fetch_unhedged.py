@@ -12,6 +12,10 @@ load_dotenv(find_dotenv())
 
 
 def get_unhedged():
+    """
+     @brief Get unhedged strategy events from pgbouncer. Postgres is used to fetch data and it is recommended to use this function for production
+     @return dict with unhedged strategy
+    """
     connection = psycopg2.connect(user=os.getenv("POSTGRES_USERNAME"),
                                   password=os.getenv("POSTGRES_PASSWORD"),
                                   host="pgbouncer",
@@ -24,6 +28,7 @@ def get_unhedged():
     rows = cursor.fetchall()
     cursor.close()
 
+    # update strategy_mark_to_market_unhedged_amount_events with price of unhedged amount events
     for row in rows:
         row_time = row[1]
         # time_from = int(datetime.datetime.strptime(row_time, "%Y-%m-%d %H:%M:%S.%f").timestamp())
@@ -53,5 +58,6 @@ def get_unhedged():
     return
 
 
+# Get unhedged data from the unhedged data.
 if __name__ == '__main__':
     get_unhedged()

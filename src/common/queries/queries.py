@@ -16,7 +16,21 @@ from src.common.utils.utils import Util, itertools_flatten, spread_entry_func, s
 
 
 class PriceResult:
+    """
+    @brief Class to hold and manipulate price query results.
+    
+    This class stores price data along with timestamps and provides methods to retrieve
+    data for specified time ranges.
+    """
+
     def __init__(self, prices, t0, t1):
+        """
+        @brief Initializes the PriceResult with prices and time range.
+        
+        @param prices DataFrame containing the price data.
+        @param t0 Start time in milliseconds.
+        @param t1 End time in milliseconds.
+        """
         self.prices = prices
         if len(self.prices) == 0:
             self.int_timestamps = []
@@ -28,6 +42,14 @@ class PriceResult:
         self.t1 = t1
 
     def has_data(self, t0, t1):
+        """
+        @brief Checks if there is data for the specified time range.
+        
+        @param t0 Start time in milliseconds.
+        @param t1 End time in milliseconds.
+        
+        @return True if data is available, False otherwise.
+        """
         if len(self) == 0:
             return False
         t0_ix = self.int_timestamps.searchsorted(t0, side='left')
@@ -36,6 +58,14 @@ class PriceResult:
         return self.int_timestamps[t0_ix] <= t1 and self.int_timestamps[t0_ix] >= t0
 
     def get_data(self, t0, t1):
+        """
+        @brief Retrieves data for the specified time range.
+        
+        @param t0 Start time in milliseconds.
+        @param t1 End time in milliseconds.
+        
+        @return DataFrame containing the price data for the specified time range, or None if no data is available.
+        """
         if not self.has_data(t0, t1):
             return None
 
@@ -44,16 +74,42 @@ class PriceResult:
         return self.prices.iloc[index_update_start:index_update_end]
 
     def __len__(self):
+        """
+        @brief Returns the length of the price data.
+        
+        @return The number of price entries.
+        """
         return len(self.prices)
 
 
 class DataQueryBase:
+    """
+    @brief Base class for querying data from an InfluxDB instance.
+    
+    This class provides a common interface for querying data and filling NaN values.
+    """
+
     def __init__(self, client):
+        """
+        @brief Initializes the DataQueryBase with a client.
+        
+        @param client The client to use for querying data.
+        """
         self.client = client
         self.influx_connection = InfluxConnection.getInstance()
         self.query = None
 
     def query_data(self, t0, t1):
+        """
+        @brief Queries data for the specified time range.
+        
+        @param t0 Start time in milliseconds.
+        @param t1 End time in milliseconds.
+        
+        @return An array containing the queried data.
+        
+        @throws Exception if no query is set.
+        """
         if self.query is None:
             raise Exception("No query set")
         result = self.influx_connection.query_influx(self.client, self.query(t0, t1))
@@ -61,6 +117,13 @@ class DataQueryBase:
 
     @staticmethod
     def fill_nans(array):
+        """
+        @brief Fills NaN values in an array using forward fill.
+        
+        @param array The array with potential NaN values.
+        
+        @return An array with NaN values filled.
+        """
         mask = np.isnan(array)
         idx = np.where(~mask, np.arange(mask.shape[0]), -mask.shape[0] + 1)
         idx = np.maximum.accumulate(idx, axis=0)
@@ -69,7 +132,21 @@ class DataQueryBase:
 
 
 class Prices(DataQueryBase):
+    """
+    @brief Class for querying price data from an InfluxDB instance.
+    
+    This class extends DataQueryBase to provide specific functionality for querying and processing price data.
+    """
+
     def __init__(self, client, exchange, symbol, side=None):
+        """
+        @brief Initializes the Prices class with client, exchange, symbol, and side.
+        
+        @param client The client to use for querying data.
+        @param exchange The exchange name.
+        @param symbol The trading symbol.
+        @param side Optional; the side of the trade ('buy' or 'sell').
+        """
         super().__init__(client)
         self.exchange = exchange
         self.symbol = symbol
@@ -82,6 +159,16 @@ class Prices(DataQueryBase):
         self.threadpool_executor = ThreadPoolExecutor(max_workers=2)
 
     def query_data(self, t0, t1):
+        """
+        @brief Queries price data for the specified time range.
+        
+        @param t0 Start time in milliseconds.
+        @param t1 End time in milliseconds.
+        
+        @return A PriceResult object containing the queried price data.
+        
+        @throws Exception if no query is set.
+        """
         if self.query is None:
             raise Exception("No query set")
         if os.getenv("USE_LOCAL_INFLUXDB_CACHE") != "true":
@@ -100,6 +187,11 @@ class Prices(DataQueryBase):
         return PriceResult(result['price'], t0, t1)
 
     def write_to_influx(self, result):
+        """
+        @brief Writes the queried price data to a local InfluxDB instance.
+        
+        @param result The DataFrame containing the queried price data.
+        """
         for j in range(0, len(result['price']), 10000):
             points = Util.influx_points_from_dataframe(result['price'][j:  j + 10000], 'price',
                                                        tag_columns=["side"],
@@ -108,8 +200,15 @@ class Prices(DataQueryBase):
             self.influx_connection.local_client_spotswap.write_points(points, time_precision='n')
 
 
+
 class Takers(DataQueryBase):
     def __init__(self, client, exchanges, symbols):
+        """
+         @brief Initializes the Trade object. This is the method that should be called by the client when it is ready to send a request
+         @param client The client to use for the request
+         @param exchanges The list of exchanges to query for
+         @param symbols The list of symbols to query for ( must be unique
+        """
         super().__init__(client)
         self.exchanges = exchanges
         self.symbols = symbols
@@ -122,18 +221,28 @@ class Takers(DataQueryBase):
 
 @functools.lru_cache(maxsize=2)
 def query_data(self, t0, t1):
+    """
+     @brief Query Takers and return data. This is a wrapper around InfluxDB's query_data method to allow us to use it in conjunction with the cache option
+     @param t0 timestamp of first trade in milliseconds
+     @param t1 timestamp of last trade in milliseconds ( inclusive
+    """
+    # Raise exception if no query set is set.
     if self.query is None:
         raise Exception("No query set")
+    # Returns a TakersResult object with the result of the query.
     if os.getenv("USE_LOCAL_INFLUXDB_CACHE") != "true":
         result = self.influx_connection.query_influx(self.client, self.query(t0, t1), epoch="ns")
+        # Return a TakersResult object with the result of the first call to TakersResult.
         if len(result) == 0:
             return TakersResult([], t0, t1)
         return TakersResult(result['trade'], t0, t1)
 
     result = self.influx_connection.query_influx(self.influx_connection.local_client_spotswap_dataframe,
                                                  self.query(t0, t1), epoch="ns")
+    # Returns a TakersResult object with the result of the query.
     if len(result) == 0 or t1 - int(result['trade'].index.view(np.int64)[-1] / 1000000) > 1000 * 60:
         result = self.influx_connection.query_influx(self.client, self.query(t0, t1), epoch="ns")
+        # Return a TakersResult object with the result of the first call to TakersResult.
         if len(result) == 0:
             return TakersResult([], t0, t1)
         self.threadpool_executor.submit(self.write_to_influx, result)
@@ -141,6 +250,12 @@ def query_data(self, t0, t1):
 
 
 def query_median_traded(self, t0, t1):
+    """
+     @brief Queries the traded median for the given time range. This is used to calculate the size of trade that is required to achieve the desired trade quality
+     @param t0 start time of the interval in unix time units ( inclusive ). If it is less than 30 days it will be adjusted to be less than 30 days ago. The result will be in nanoseconds. Note
+     @param t1 end time of the interval in unix time units ( inclusive ). If it is greater than 30 days it will be adjusted to be less than 30
+    """
+    # Time in seconds since the epoch.
     if t1 - t0 < 1000 * 60 * 60 * 24 * 30:
         t0 = t1 - 1000 * 60 * 60 * 24 * 30
     where_query = " OR ".join([f"(exchange = '{self.exchanges[j]}' AND symbol = '{self.symbols[j]}')" for j in
@@ -152,6 +267,11 @@ def query_median_traded(self, t0, t1):
 
 
 def write_to_influx(self, result):
+    """
+     @brief Write data to Influx. This is a blocking call so it will return after all data has been written
+     @param result A dictionary containing trades
+    """
+    # Write points to the local client spotswap
     for j in range(0, len(result['trade']), 10000):
         points = Util.influx_points_from_dataframe(result['trade'][j:  j + 10000], 'trade',
                                                    tag_columns=["exchange", "symbol", "side"],
@@ -162,9 +282,16 @@ def write_to_influx(self, result):
 
 class TakersResult:
     def __init__(self, takers, t0, t1):
+        """
+         @brief Initialize the TimeSeries object. This is the method that must be called by the derived class to initialize the data.
+         @param takers The time series of the event.
+         @param t0 The start time of the interval. If this is a datetime. datetime object it will be converted to a timestamp.
+         @param t1 The end time of the interval. If this is a datetime
+        """
         self.takers = takers
         self.t0 = t0
         self.t1 = t1
+        # This method is used to create a list of all the takers.
         if len(self.takers) == 0:
             self.int_timestamps = []
         else:
@@ -173,12 +300,26 @@ class TakersResult:
             self.int_timestamps = np.array((self.takers.index.view(np.int64) + 1) / 1000000).astype(np.int64)
 
     def has_data(self, t0, t1):
+        """
+         @brief Check if there is data between t0 and t1. This is used to detect if a set of time points is in the set and if it is the case.
+         @param t0 The start of the interval. This is expected to be in seconds since the epoch.
+         @param t1 The end of the interval. This is expected to be in seconds since the epoch.
+         @return True if there is data between t0 and t1
+        """
+        # Return True if the list is empty.
         if len(self) == 0:
             return False
         t0_ix = self.int_timestamps.searchsorted(t0, side='left')
         return self.int_timestamps[t0_ix] <= t1 and self.int_timestamps[t0_ix] >= t0
 
     def get_data(self, t0, t1):
+        """
+         @brief Get data between t0 and t1. This is useful for testing the update_takers method
+         @param t0 start time of the interval in seconds since 1970 - 01 - 01 00 : 00 : 00 UTC
+         @param t1 end time of the interval in seconds since 1970 - 01 - 01 00 : 00 : 00 UTC
+         @return pandas DataFrame or None if there is no data between
+        """
+        # Return the data at t0 t1 if there is no data at t0 and t1.
         if not self.has_data(t0, t1):
             return None
 
@@ -187,11 +328,21 @@ class TakersResult:
         return self.takers.iloc[index_update_start:index_update_end]
 
     def __len__(self):
+        """
+         @brief Returns the number of takers in the collection. This is useful for debugging and to know how many objects are in the collection.
+         @return The number of takers in the collection as an
+        """
         return len(self.takers)
 
 
 class Funding(DataQueryBase):
     def __init__(self, client, exchange, symbol):
+        """
+         @brief Initializes the Funding object. This is the method that will be called by the : class : ` ~plexapi. client. Client ` when it is created
+         @param client The client to use for communication
+         @param exchange The exchange to query funds for. Must be one of the exchange types listed in the class documentation.
+         @param symbol The symbol to query funds for. Must be one of the symbol types listed in the class documentation
+        """
         super().__init__(client)
         self.exchange = exchange
         self.symbol = symbol
@@ -202,9 +353,17 @@ class Funding(DataQueryBase):
 
 @functools.lru_cache(maxsize=2)
 def query_data(self, t0, t1):
+    """
+     @brief Query data and return it as FundingResult. This is a low - level method to be used by subclasses.
+     @param t0 Timestamp to start querying from. If None the query will start from the current time.
+     @param t1 Timestamp to end querying from. If None the query will start from the current time.
+     @return FundingResult with data from the query or an empty list if no data
+    """
+    # Raise exception if no query set is set.
     if self.query is None:
         raise Exception("No query set")
     result = self.influx_connection.query_influx(self.client, self.query(t0, t1), epoch="ns")
+    # Return a FundingResult with the result of the first call to FundingResult.
     if len(result) == 0:
         return FundingResult([], t0, t1)
     return FundingResult(result['funding'], t0, t1)
@@ -212,9 +371,16 @@ def query_data(self, t0, t1):
 
 class FundingResult:
     def __init__(self, funding, t0, t1):
+        """
+         @brief Initializes the object with data. This is the method that must be called by the user
+         @param funding The funding data to use
+         @param t0 The start time of the simulation in seconds
+         @param t1 The end time of the simulation in seconds
+        """
         self.funding = funding
         self.t0 = t0
         self.t1 = t1
+        # This method is used to set the funding data.
         if len(self.funding) == 0:
             self.int_timestamps = []
         else:
@@ -223,12 +389,26 @@ class FundingResult:
             self.int_timestamps = np.array((self.funding.index.view(np.int64) + 1) / 1000000).astype(np.int64)
 
     def has_data(self, t0, t1):
+        """
+         @brief Check if there is data between t0 and t1. This is used to detect if a set of time points is in the set and if it is the case.
+         @param t0 The start of the interval. This is expected to be in seconds since the epoch.
+         @param t1 The end of the interval. This is expected to be in seconds since the epoch.
+         @return True if there is data between t0 and t1
+        """
+        # Return True if the list is empty.
         if len(self) == 0:
             return False
         t0_ix = self.int_timestamps.searchsorted(t0, side='left')
         return self.int_timestamps[t0_ix] <= t1 and self.int_timestamps[t0_ix] >= t0
 
     def get_data(self, t0, t1):
+        """
+         @brief Get data between t0 and t1. This is useful for testing the Funding object
+         @param t0 timestamp of start of data range
+         @param t1 timestamp of end of data range ( inclusive )
+         @return pandas DataFrame or None if there is no data between
+        """
+        # Return the data at t0 t1 if there is no data at t0 and t1.
         if not self.has_data(t0, t1):
             return None
 
@@ -237,34 +417,48 @@ class FundingResult:
         return self.funding.iloc[index_update_start:index_update_end]
 
     def __len__(self):
+        """
+         @brief Returns the number of funds in the funding. This is an alias for len ( self. funding )
+         @return int ** of the number of funds in the
+        """
         return len(self.funding)
 
 
 @numba.jit(nopython=True)
 def df_numba(df_mat):
+    """
+     @brief Numba divergences are defined as the difference between the last and the first.
+     @param df_mat Matrix of data points. Must be in row - major order.
+     @return Same matrix with numerical divergences applied to each
+    """
+    # Compute the matrix of the matrix of the matrix.
     for idx in range(1, len(df_mat) - 1):
+        # Compute the matrix of the matrix of the matrix.
         if df_mat[idx, 0] >= df_mat[idx, 2]:
             df_mat[idx, 5] = df_mat[idx - 1, 5] + abs(df_mat[idx, 0] - df_mat[idx, 2]) * df_mat[idx, 4]
 
+        # Compute the matrix of the matrix of the matrix of the matrix.
         if df_mat[idx, 1] <= df_mat[idx, 3]:
             df_mat[idx, 6] = df_mat[idx - 1, 6] + abs(df_mat[idx, 1] - df_mat[idx, 3]) * df_mat[idx, 4]
     return df_mat
 
-
 def get_strategy_pos_value(t0, t1, strategy, **kwargs):
     """
-    A function inorder to find the current value of a strategy
-    Inputs:
-    t0 :  starting time
-    t1 : ending time
-    strategy : strategy name
+    @brief Retrieves the current value of a strategy within a specified time range.
 
-    Outputs:
-    df : a dataframe containing the current value of a strategy
+    This function queries the InfluxDB to find the current value of a strategy's position
+    within the provided time range and returns the result as a DataFrame.
 
-    Args:
-        **kwargs:
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param strategy The name of the strategy.
 
+    @param kwargs Additional arguments (optional).
+
+    @return A DataFrame containing the current value of the strategy's position.
+            If no data is found, the function returns and prints an empty DataFrame message.
+
+    @note The function queries the production environment of the InfluxDB for data.
     """
     connection = InfluxConnection.getInstance()
     result = connection.prod_client_spotswap_dataframe.query(
@@ -279,14 +473,23 @@ def get_strategy_pos_value(t0, t1, strategy, **kwargs):
 
 def get_inout_pos(t0, t1, strategy, environment):
     """
-    A function to determine the time stamps that we are in position
-    Inputs:
-    t0 :  starting time
-    t1 : ending time
-    strategy : strategy name
+    @brief Determines the timestamps when a strategy is in position within a specified time range.
 
-    Outputs:
-    df : a dataframe that contains the time when we entered the position and when we exited the position
+    This function identifies the timestamps when a strategy enters and exits a position
+    by querying the position values from the InfluxDB within the specified time range.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param strategy The name of the strategy.
+    @param environment The environment to query ('server' or other).
+
+    @return A DataFrame containing the timestamps of entering and exiting positions with columns:
+            - 'Start': The start time of the position.
+            - 'End': The end time of the position.
+
+            If no data is found, the function returns an empty DataFrame with NaT values for 'Start' and 'End'.
+
+    @note The function handles different environments for querying, including server and production.
     """
     if environment == 'server':
         result = client1.query(
@@ -326,18 +529,24 @@ def get_inout_pos(t0, t1, strategy, environment):
 
 def get_quanto_profit(t0, t1, strategy):
     """
-    A function to return the Qunato profit of an ETHUSD strategy
+    @brief Retrieves the Quanto profit for a given ETHUSD strategy within a specified time range.
 
-    Inputs:
-    t0 : starting time in ms
-    t1 : ending time in ms
-    strategy :  strategy name
+    This function queries the InfluxDB to obtain the Quanto profit for a given ETHUSD strategy
+    and returns the result as a DataFrame containing both the Quanto profit and the corresponding
+    Dollar profit.
 
-    Outputs:
-    df =  dataframe containing the Quanto Profit and the Quanto Profit in Dollars
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param strategy The name of the strategy.
 
+    @return A DataFrame containing the following columns:
+            - "Quanto profit per ETH": The normalized Quanto profit per ETH.
+            - "Dollar profit": The Quanto profit in Dollars.
+
+            If no data is found, the function returns and prints an empty DataFrame message.
+
+    @note The function queries the production environment of the InfluxDB for data.
     """
-
     query_string = f'''SELECT "normalized_profit" AS "Quanto profit per ETH",
     "normalized_profit" * "position" AS "Dollar profit"
     FROM "mark_to_market_quanto_profit" WHERE ("strategy" = '{strategy}') AND time > {t0}ms AND time < {t1}ms '''
@@ -358,17 +567,25 @@ def get_price(t_start,
               split_data=True,
               use_side=True):
     """
-    A function to retrieve the current price of the future
-    Inputs:
-    t0 : starting time
-    t1: ending time
-    exchange :  the exchange (default : BitMEX)
-    symbol :  the symbol of the contract (default : XBTUSD)
+    @brief Retrieves the current price of a future contract within a specified time range.
 
-    Outputs:
-    df : a dataframe containing the price of the future
+    This function queries the InfluxDB to obtain the current price of a specified future contract
+    within the provided time range. It supports splitting data into smaller chunks for efficient querying.
+
+    @param t_start The starting time in milliseconds.
+    @param t_end The ending time in milliseconds.
+    @param exchange The name of the exchange (default: 'BitMEX').
+    @param symbol The symbol of the contract (default: 'XBTUSD').
+    @param side The side of the trade (default: 'Ask').
+    @param environment The environment to query ('production', 'server', 'staging').
+    @param split_data Boolean flag to split data into smaller chunks for querying (default: True).
+    @param use_side Boolean flag to include the side of the trade in the query (default: True).
+
+    @return A DataFrame containing the price data for the future contract.
+            If no data is found, the function returns and prints an empty DataFrame message.
+
+    @note The function handles different environments for querying, including server, production, and staging.
     """
-
     day_in_millis = 1000 * 60 * 60 * 6
     if t_end - t_start >= day_in_millis and split_data:
         t_start = t_start
@@ -439,6 +656,22 @@ def get_price(t_start,
 
 
 def get_symbol(t0, t1, exchange, environment):
+    """
+    @brief Retrieves the symbols associated with a specific exchange within a given time range.
+
+    This function queries the InfluxDB to obtain the trading symbols associated with the specified
+    exchange within the provided time range. It returns the symbols as a Pandas Series.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param exchange The name of the exchange.
+    @param environment The environment to query ('server', 'production', 'staging').
+
+    @return A Pandas Series containing the trading symbols for the specified exchange.
+            If the environment is not recognized, the function returns None.
+
+    @note The function handles different environments for querying, including server, production, and staging.
+    """
     query_string = f"""SHOW TAG VALUES   FROM "price"  WITH KEY  IN ( "symbol" ,"exchange") where
     ("exchange" = '{exchange}') AND time > {t0}ms AND time < {t1}ms """
     if environment == 'server':
@@ -461,6 +694,21 @@ def get_symbol(t0, t1, exchange, environment):
 
 
 def get_exhange_names(t0, t1, environment):
+    """
+    @brief Retrieves the names of exchanges within a given time range.
+
+    This function queries the InfluxDB to obtain the names of exchanges that have data
+    within the specified time range. It returns the exchange names as a Pandas Series.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param environment The environment to query ('server', 'production', 'staging').
+
+    @return A Pandas Series containing the names of the exchanges.
+            If the environment is not recognized, the function returns None.
+
+    @note The function handles different environments for querying, including server, production, and staging.
+    """
     query_string = f"""SHOW TAG VALUES   FROM "price"  WITH KEY="exchange" WHERE  time > {t0}ms AND time < {t1}ms  """
     if environment == 'server':
         result = client1.query(query_string, epoch="ns")
@@ -482,6 +730,18 @@ def get_exhange_names(t0, t1, environment):
 
 
 def get_strategy_influx(environment='production'):
+    """
+    @brief Retrieves the names of strategies stored in the InfluxDB.
+
+    This function queries the InfluxDB to obtain the names of strategies that are stored
+    in the 'band' measurement. It returns the strategy names as a Pandas Series.
+
+    @param environment The environment to query ('server', 'production', 'staging').
+
+    @return A Pandas Series containing the names of the strategies.
+
+    @note The function handles different environments for querying, including server, production, and staging.
+    """
     query_string = f"""SHOW TAG VALUES   FROM "band"  WITH KEY="strategy"  """
     if environment == 'server':
         result = client1.query(query_string, epoch="ns")
@@ -503,6 +763,22 @@ def get_strategy_influx(environment='production'):
 def get_orderbook_price(t0, t1, exchange='Deribit', spotInstrument='hybrid_BTC-PERPETUAL',
                         swapInstrument='hybrid_BTC-USD',
                         type=0, environment='production'):
+    """
+    @brief Retrieves order book prices for specified instruments within a given time range.
+
+    This function queries the InfluxDB to obtain the spot and swap prices from the order book
+    for the specified instruments and exchange within the provided time range.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param exchange The name of the exchange (default: 'Deribit').
+    @param spotInstrument The name of the spot instrument (default: 'hybrid_BTC-PERPETUAL').
+    @param swapInstrument The name of the swap instrument (default: 'hybrid_BTC-USD').
+    @param type The type of order book data to query (default: 0).
+    @param environment The environment to query ('server', 'production').
+
+    @return A DataFrame containing the order book prices for the specified instruments.
+    """
     if environment == 'server':
         result = client1.query(f'''SELECT "price_spot",
             "price_swap" FROM "orderbook_update" WHERE ("exchangeName" ='{exchange}'
@@ -523,18 +799,27 @@ def get_orderbook_price(t0, t1, exchange='Deribit', spotInstrument='hybrid_BTC-P
 def get_entry_opportunity_points(t0, t1, exchange='Deribit', spot='hybrid_ETH-PERPETUAL', swap='hybrid_ETHUSD',
                                  environment='production'):
     """
-        A function in order to obtain the entry opportunity points
-        Inputs:
-        t0 :  starting time in ms
-        t1 :  ending time in ms
-        exchange : the exchange (default : 'Deribit')
-        spot : the spot product name (default: 'hybrid_ETH-PERPETUAL')
-        swap : the swap product name (default : 'hybrid_ETHUSD')
+    @brief Retrieves entry opportunity points for specified instruments within a given time range.
 
-        Outputs:
-        df= a dataframe containing the 'Entry Opportunity', Entry Opportunity_takers' and 'Entry Opportunity_takers_lat'
-        columns. If the last two columns do not exist then it will return only the 'Entry Opportunity'
-        """
+    This function queries the InfluxDB to obtain the entry opportunity points for the specified
+    instruments and exchange within the provided time range. It returns a DataFrame containing
+    the entry opportunities.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param exchange The name of the exchange (default: 'Deribit').
+    @param spot The name of the spot instrument (default: 'hybrid_ETH-PERPETUAL').
+    @param swap The name of the swap instrument (default: 'hybrid_ETHUSD').
+    @param environment The environment to query ('server', 'production').
+
+    @return A DataFrame containing the entry opportunity points with columns:
+            - 'Time': The timestamp of the entry opportunity.
+            - 'Entry Opportunity': The entry opportunity value.
+            - 'Entry Opportunity_takers': The entry opportunity for takers.
+            - 'Entry Opportunity_takers_lat': The entry opportunity for takers with latency.
+
+            If the last two columns do not exist, the function returns only the 'Entry Opportunity'.
+    """
     if environment == 'server':
         result = client1.query(f'''SELECT "opportunity" FROM "trading_opportunities"
                                                                         WHERE ("exchangeName" = '{exchange}' AND "spotInstrument" = '{spot}' AND "swapInstrument" = '{swap}' AND "type"='0')
@@ -591,17 +876,26 @@ def get_entry_opportunity_points(t0, t1, exchange='Deribit', spot='hybrid_ETH-PE
 def get_exit_opportunity_points(t0, t1, exchange='Deribit', spot='hybrid_ETH-PERPETUAL', swap='hybrid_ETHUSD',
                                 environment='production'):
     """
-    A function in order to obtain the exit opportunity points
-    Inputs:
-    t0 :  starting time in ms
-    t1 :  ending time in ms
-    exchange : the exchange (default : 'Deribit')
-    spot : the spot product name (default: 'hybrid_ETH-PERPETUAL')
-    swap : the swap product name (default : 'hybrid_ETHUSD')
+    @brief Retrieves exit opportunity points for specified instruments within a given time range.
 
-    Outputs:
-    df= a dataframe containing the 'Exit Opportunity', Exit Opportunity_takers' and 'Exit Opportunity_takers_lat'
-    columns. If the last two columns do not exist then it will return only the 'Exit Opportunity'
+    This function queries the InfluxDB to obtain the exit opportunity points for the specified
+    instruments and exchange within the provided time range. It returns a DataFrame containing
+    the exit opportunities.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param exchange The name of the exchange (default: 'Deribit').
+    @param spot The name of the spot instrument (default: 'hybrid_ETH-PERPETUAL').
+    @param swap The name of the swap instrument (default: 'hybrid_ETHUSD').
+    @param environment The environment to query ('server', 'production').
+
+    @return A DataFrame containing the exit opportunity points with columns:
+            - 'Time': The timestamp of the exit opportunity.
+            - 'Exit Opportunity': The exit opportunity value.
+            - 'Exit Opportunity_takers': The exit opportunity for takers.
+            - 'Exit Opportunity_takers_lat': The exit opportunity for takers with latency.
+
+            If the last two columns do not exist, the function returns only the 'Exit Opportunity'.
     """
     if environment == 'server':
         result = client1.query(f'''SELECT "opportunity" FROM "trading_opportunities"
@@ -665,16 +959,22 @@ def get_exit_opportunity_points(t0, t1, exchange='Deribit', spot='hybrid_ETH-PER
 
 def get_strat_curr_value(t0, t1, strategy, environment='production'):
     """
-    A function in order to get the current value of a given strategy.
-    Inputs:
-    t0 : starting time in ms
-    t1 : ending time in ms
-    strategy :  the given strategy name
+    @brief Retrieves the current value of a given strategy within a specified time range.
 
-    Outputs:
-    df :  a dataframe containing the time stamp 'Time' and the current value of a strategy 'alias'.
+    This function queries the InfluxDB to obtain the current value of a specified strategy
+    and returns a DataFrame containing the strategy's value along with spot and swap funds.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param strategy The name of the strategy.
+    @param environment The environment to query ('server', 'production').
+
+    @return A DataFrame containing the following columns:
+            - 'Time': The timestamp of the strategy's value.
+            - 'strategy_value': The current value of the strategy.
+            - 'spot_funds': The spot funds associated with the strategy.
+            - 'swap_funds': The swap funds associated with the strategy.
     """
-
     if environment == 'server':
         result = client1.query(f'''SELECT "current_value" AS "strategy_value" ,
                                                                     "spot_funds","swap_funds"
@@ -695,22 +995,32 @@ def get_strat_curr_value(t0, t1, strategy, environment='production'):
     df = df[['Time', 'strategy_value', 'spot_funds', 'swap_funds']]
     return df
 
-
 def get_entry_exit_bands(t0, t1, strategy, entry_delta_spread, exit_delta_spread, btype='central_band',
                          environment='production'):
     """
-    A function in order to get the central band, the entry band and the exit band of a given strategy
-    Inputs:
-     t0 : starting time in ms
-     t1 : ending time in ms
-     strategy :  strategy name
-     entry_delta_spread :  entry delta spread for the given strategy
-     exit_delta_spread :  exit delta spread for the given strategy
+    @brief Retrieves the central, entry, and exit bands for a given strategy within a specified time range.
 
-     Outputs:
-      df : dataframe with central band, entry band, exit band
+    This function queries the InfluxDB to obtain the central band and calculates the entry and exit bands
+    for the specified strategy. The bands are based on the provided entry and exit delta spreads.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param strategy The name of the strategy.
+    @param entry_delta_spread The entry delta spread for the given strategy.
+    @param exit_delta_spread The exit delta spread for the given strategy.
+    @param btype The type of band to return ('central_band' or 'Central Band').
+    @param environment The environment to query ('server', 'production', 'staging').
+
+    @return A DataFrame containing the following columns:
+            - 'Time': The timestamp of the band values.
+            - 'Band': The central band value.
+            - 'Entry Band': The calculated entry band value.
+            - 'Exit Band': The calculated exit band value.
+
+            If the DataFrame is empty, the function prints 'empty dataframe'.
+
+    @note The function handles different environments for querying, including server, production, and staging.
     """
-
     if environment == 'server':
         result = client1.query(f'''SELECT ("exit_window_avg" + "entry_window_avg")/2 AS "Band"
         FROM bogdan_bins_{strategy} WHERE time >= {t0}ms and time <= {t1}ms''', epoch='ns')
@@ -741,16 +1051,28 @@ def get_entry_exit_bands(t0, t1, strategy, entry_delta_spread, exit_delta_spread
 def get_executions(t0, t1, strategy: str = None, environment: str = "production", group: bool = False,
                    group_name: str = 'XBTUSD', get_type: bool = False):
     """
-    A function in order to get the executions and the volume of the executions in a given time period
-    Inputs:
-    t0 : starting time in ms
-    t1 : ending time in ms
-    strategy :  strategy name, exit
+    @brief Retrieves execution data and execution volumes within a specified time period.
 
-    Outputs:
-    df : a dataframe containing the 'Time', 'entry_executions', 'exit_executions','entry_volume','exit_volume'
+    This function queries the InfluxDB to obtain execution data, including entry and exit executions
+    and volumes, for a specified strategy within the given time range.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param strategy The name of the strategy.
+    @param environment The environment to query ('production', 'server').
+    @param group Whether to group the results by strategy (default: False).
+    @param group_name The group name to filter strategies (default: 'XBTUSD').
+    @param get_type Whether to return the execution type (default: False).
+
+    @return A DataFrame containing the following columns:
+            - 'Time': The timestamp of the executions.
+            - 'entry_executions': The entry execution spreads.
+            - 'exit_executions': The exit execution spreads.
+            - 'entry_volume': The volume of entry executions.
+            - 'exit_volume': The volume of exit executions.
+
+            If the DataFrame is empty, the function prints 'empty data frame'.
     """
-
     if environment == "production":
         connection = InfluxConnection.getInstance()
         if group:
@@ -787,10 +1109,17 @@ def get_executions(t0, t1, strategy: str = None, environment: str = "production"
 
 def get_strategy_names(t0, environment='production'):
     """
-    function to get the strategy names
-    environment : server strategies are stored(default : production)
-    """
+    @brief Retrieves the names of strategies stored in the InfluxDB.
 
+    This function queries the InfluxDB to obtain the names of strategies stored
+    in the 'band' measurement for the given environment and time range.
+
+    @param t0 The starting time in milliseconds.
+    @param environment The environment to query ('production', 'server').
+
+    @return A DataFrame containing the following column:
+            - 'strategy': The names of the strategies.
+    """
     if environment == 'production':
         connection = InfluxConnection.getInstance()
         result = connection.prod_client_spotswap_dataframe.query(f'''SHOW TAG VALUES FROM "band"
@@ -812,18 +1141,20 @@ def get_strategy_names(t0, environment='production'):
 
 def average_difference(t0, t1, strategy: str, entry_delta_spread: float, exit_delta_spread: float):
     """
-    a function to find the weighted average difference of entry/exit executions
+    @brief Calculates the weighted average difference of entry/exit executions.
 
-    Inputs:
-    t0 : starting time
-    t1 : ending time
-    strategy : strategy name
-    entry_delta_spread : entry delta spread of strategy
-    exit_delta_spread :  exit delta spread of strategy
+    This function computes the weighted average difference between entry and exit
+    executions over the given time range and for a specified strategy.
 
-    Outputs:
-    entry_avg_diff :  entry executions average difference weighted over volume
-    exit_avg_diff :  exit executions average difference weighted over volume
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param strategy The name of the strategy.
+    @param entry_delta_spread The entry delta spread for the strategy.
+    @param exit_delta_spread The exit delta spread for the strategy.
+
+    @return A tuple containing:
+            - entry_avg_diff: The entry executions average difference weighted over volume.
+            - exit_avg_diff: The exit executions average difference weighted over volume.
     """
     df = get_entry_exit_bands(t0, t1, strategy, entry_delta_spread, exit_delta_spread)
     df1 = get_executions(t0, t1, strategy)
@@ -844,14 +1175,21 @@ def average_difference(t0, t1, strategy: str, entry_delta_spread: float, exit_de
 
 def get_strategy_families(t0, environment='production'):
     """
-    A function to get all strategies in production and place them in families.
-    Inputs:
-    t0 : a starting time
-    environment : server strategies are stored(default : production)
+    @brief Retrieves strategy families based on strategy names in production.
 
-    Outputs:
-    strategy_families : a dictionary with all strategies in families.
-                        dictionary keys : 'deribit_eth','deribit_xbtusd','huobi_xbtusd','huobi_eth'
+    This function queries the InfluxDB to obtain all strategies in production and
+    organizes them into families based on specific naming conventions.
+
+    @param t0 The starting time in milliseconds.
+    @param environment The environment to query ('production', 'server').
+
+    @return A dictionary containing the strategy families with the following keys:
+            - 'deribit_eth': List of strategies related to 'ETHUSD'.
+            - 'deribit_xbtusd': List of strategies related to 'deribit_XBTUSD_maker_perpetual'.
+            - 'huobi_xbtusd': List of 'huobi_xbtusd' strategies excluding 'ETH'.
+            - 'huobi_eth': List of strategies related to 'deribit_perp_huobi_perp_ETH'.
+
+            If the environment is not recognized, the function returns only 'huobi_xbtusd' and 'huobi_eth'.
     """
     strategies = get_strategy_names(t0, environment=environment)
     deribit_eth = itertools_flatten(strategies.
@@ -881,14 +1219,22 @@ def get_strategy_families(t0, environment='production'):
 
 def get_microparams_strategy(t0, t1, strategy, environment='production'):
     """
-    a function to get the entry and exit delta spread and the window size for every strategy in production.
-    Inputs:
-    t0 : starting time
-    t1 : ending time
-    strategy :  strategy name
+    @brief Retrieves the entry and exit delta spread and window size for a given strategy.
 
-    Outputs
-    df = results dataframe with delta_spread, window_size and type( entry or exit)
+    This function queries the InfluxDB to obtain the micro parameters for a specified strategy,
+    including the entry and exit delta spreads and window size, within the given time range.
+
+    @param t0 The starting time in milliseconds.
+    @param t1 The ending time in milliseconds.
+    @param strategy The name of the strategy.
+    @param environment The environment to query ('production', 'server').
+
+    @return A DataFrame containing the following columns:
+            - 'window_size': The window size for the strategy.
+            - 'entry_delta_spread': The entry delta spread for the strategy.
+            - 'exit_delta_spread': The exit delta spread for the strategy.
+
+            If the DataFrame is empty, the function prints 'empty dataframe on entry or exit'.
     """
     connection = InfluxConnection.getInstance()
     if environment == "production":
@@ -913,8 +1259,18 @@ def get_microparams_strategy(t0, t1, strategy, environment='production'):
     return df
 
 
+
 def get_band_values(t0, t1, strategy, environment='production', typeb='bogdan_bands'):
+    """
+     @brief The value of the band between t0 and t1. If environment is'staging'the result is a dataframe with side values for each band. If environment is'server'the result is a dataframe with side values for each band.
+     @param t0 The start time of the time range to get values for.
+     @param t1 The end time of the time range to get values for.
+     @param strategy The strategy of the band being queried. Can be one of the following :'sloppie'' bogdan_bands '
+     @param environment
+     @param typeb
+    """
     connection = InfluxConnection.getInstance()
+    # Returns the spotswap dataframe for the current environment.
     if environment == 'production':
         result = connection.prod_client_spotswap_dataframe.query(f'''SELECT "value","side" FROM "band"
             WHERE ("strategy" ='{strategy}' AND "type" = '{typeb}')
@@ -930,6 +1286,7 @@ def get_band_values(t0, t1, strategy, environment='production', typeb='bogdan_ba
     else:
         return
 
+    # Return the result of the operation.
     if len(result) == 0:
         return
 
@@ -943,17 +1300,15 @@ def get_band_values(t0, t1, strategy, environment='production', typeb='bogdan_ba
 
 def get_execution_quality(t0, t1, strategy, environment='production'):
     """
-    function to get the difference between an execution and the band values
-    Inputs:
-    t0 : start time
-    t1 : end time
-    strategy :  strategy name
-    environment :  the server that contains the values of
-
-    Output
-    df :  dataframe with the entry execution quality and exit execution quality
+     @brief Get the difference between an execution and the band values for a strategy between t0 and t1
+     @param t0 start time of the period to query ( ms )
+     @param t1 end time of the period to query ( ms )
+     @param strategy the name of the strategy to query ( str )
+     @param environment the environment in which to query ( server or production )
+     @return a DataFrame with the difference between the execution and the band
     """
     connection = InfluxConnection.getInstance()
+    # The client side side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the server side of the
     if environment == 'production':
         result = connection.prod_client_spotswap_dataframe.query(f'''SELECT "diff_band","volume","type" FROM "execution_quality"
                WHERE( "strategy" ='{strategy}')AND time >= {t0}ms and time <= {t1}ms''', epoch='ns')
@@ -963,6 +1318,7 @@ def get_execution_quality(t0, t1, strategy, environment='production'):
     else:
         return
 
+    # Return the result of the operation.
     if len(result) == 0:
         return
 
@@ -978,6 +1334,16 @@ def get_execution_quality(t0, t1, strategy, environment='production'):
 
 
 def get_http_latency(t0, t1, strategy, environment='production', path='huobi/swap_cancel'):
+    """
+     @brief Get HTTP latency between t0 and t1. This is a function to get the HTTP latency between two times in the given strategy.
+     @param t0 The start of the time range to query.
+     @param t1 The end of the time range to query.
+     @param strategy The strategy of the data to query. Can be one of the strategies listed in the config file.
+     @param environment The environment of the data to query. Can be one of the production or server environments.
+     @param path The path of the data to query. Can be one of the swap_cancel huobi or swap_cancel.
+     @return A : class : ` pandas. DataFrame ` with the latencies
+    """
+    # server or prod client spotswap dataframe
     if environment == 'server':
         result = client1.query(f'''SELECT "latency" FROM "http_latency"
         WHERE ("strategy" = '{strategy}' AND "path" = '{path}')
@@ -994,9 +1360,26 @@ def get_http_latency(t0, t1, strategy, environment='production', path='huobi/swa
     return df[['Time', 'latency']]
 
 
+# Returns a dataframe of percentages band values.
 def get_percentage_band_values(t0, t1, lookback, recomputation_time, target_percentage_exit,
                                target_percentage_entry, entry_opportunity_source, exit_opportunity_source,
                                spot_name, spot_instrument, swap_instrument, environment='production'):
+    """
+    @brief Get the values of the percentages band. This is a function to be used in order to get the values of the entry and exit percentages band.
+    @param t0 The time at which the exchange starts.
+    @param t1 The time at which the exchange ends.
+    @param lookback The lookback in seconds. Must be greater than 0.
+    @param recomputation_time The recomputation time in seconds. Must be greater than 0.
+    @param target_percentage_exit The target percentage of the exit band.
+    @param target_percentage_entry The target percentage of the entry band.
+    @param entry_opportunity_source The opportunity source of the entropies.
+    @param exit_opportunity_source The opportunity source of the entropies.
+    @param spot_name The name of the spot exchange.
+    @param spot_instrument The instrument of the spot exchange.
+    @param swap_instrument The instrument of the swap exchange.
+    @param environment The environment of the instrument. Defaults to production.
+    @return A list of values in the form [ value_1 value_2
+    """
     connection = InfluxConnection.getInstance()
     q = f'''SELECT "value" as entry_band
                FROM "percentage_band" WHERE ("exchangeName" = '{spot_name}' AND "spotInstrument" = '{spot_instrument}'
@@ -1014,6 +1397,7 @@ def get_percentage_band_values(t0, t1, lookback, recomputation_time, target_perc
                     AND "exitOpportunitySource" = '{exit_opportunity_source}')
                     AND time >= {t0}ms and time <= {t1}ms'''
 
+    # Returns a list of client and prod client spotswap dataframe.
     if environment == 'server':
         result = client1.query(q, epoch='ns')
 
@@ -1033,6 +1417,15 @@ def get_percentage_band_values(t0, t1, lookback, recomputation_time, target_perc
 
 
 def get_quanto_profit_without_zeros(t0, t1, strategy, environment='production'):
+    """
+     @brief Get quanto profit per ETH between t0 and t1
+     @param t0 start time of period to consider
+     @param t1 end time of period to consider ( inclusive )
+     @param strategy strategy to look up ( ex_bayes cash_sell etc. )
+     @param environment environment to look up ( server or production )
+     @return pandas. DataFrame with data from market_quanto_profit
+    """
+    # server or prod client spotswap.
     if environment == 'server':
         result = client1.query(f'''SELECT mean("normalized_profit") as "Quanto profit per ETH"
         FROM "mark_to_market_quanto_profit" WHERE("strategy" = '{strategy}' AND
@@ -1051,21 +1444,20 @@ def get_quanto_profit_without_zeros(t0, t1, strategy, environment='production'):
     return df[['Time', 'Quanto profit per ETH']]
 
 
+# Returns a list of opportunity points
 def get_opportunity_points_all(t0, t1, exchange='Deribit', spot='hybrid_ETH-PERPETUAL', swap='hybrid_ETHUSD',
                                environment='production'):
     """
-        A function in order to obtain the exit opportunity points
-        Inputs:
-        t0 :  starting time in ms
-        t1 :  ending time in ms
-        exchange : the exchange (default : 'Deribit')
-        spot : the spot product name (default: 'hybrid_ETH-PERPETUAL')
-        swap : the swap product name (default : 'hybrid_ETHUSD')
-
-        Outputs:
-        df= a dataframe containing the 'Entry Opportunity', Entry Opportunity_takers' and 'Entry Opportunity_takers_lat'
-        columns. If the last two columns do not exist then it will return only the 'Entry Opportunity'
-        """
+    @brief This function returns a dataframe containing the exit opportunity points. If you want to get only the exit opportunity points use the get_exit_opportunity_points function
+    @param t0 starting time for the time series
+    @param t1 ending time for the time series ( ms )
+    @param exchange exchange product name default'Deribit '
+    @param spot spot product name default'hybrid_ETH - PERPETUAL '
+    @param swap swap product name default'hybrid_ETHUSD '
+    @param environment environment in which to query default'production '
+    @return a dataframe containing the 'Entry Opportunity', Entry Opportunity_takers' and 'Entry Opportunity_takers_lat' columns. If the last two columns do not exist then it will return only the 'Entry Opportunity'
+    """
+    # Returns a dataframe of opportunity types for the given environment.
     if environment == 'server':
         result = client1.query(f'''SELECT "opportunity" , "type" FROM "trading_opportunities"
                                                                         WHERE ("exchangeName" = '{exchange}' AND "spotInstrument" = '{spot}' AND "swapInstrument" = '{swap}')
@@ -1089,8 +1481,30 @@ def get_opportunity_points_all(t0, t1, exchange='Deribit', spot='hybrid_ETH-PERP
 
     return result["trading_opportunities"]
 
-
 def get_avg_fixed_spreads(t0, t1, family="deribit_xbtusd"):
+    """
+    @brief Get average fixed spreads for a given time interval and strategy family.
+
+    This function computes the average fixed spreads over a specified time range and strategy family.
+    It supports different spread families such as "deribit_xbtusd" and "deribit_eth" and performs
+    database queries to calculate and return the results.
+
+    @param t0 The start time in milliseconds.
+    @param t1 The end time in milliseconds.
+    @param family The spread family to query. Supported families are "deribit_xbtusd" and "deribit_eth".
+
+    @return A DataFrame containing the average fixed spreads with the following columns:
+            - 'vol_entry': The last recorded entry volume.
+            - 'vol_exit': The last recorded exit volume.
+            - 'fixed_spread': The last calculated fixed spread.
+            - 'min_vol_mult_fixed_spread': The minimum volume multiplied by the last fixed spread.
+            - 'strategy': The name of the strategy.
+
+            If no data is found, the function returns None.
+
+    @note The function queries the InfluxDB to retrieve relevant data based on the specified family
+          and calculates the average fixed spreads accordingly.
+    """
     connection = InfluxConnection.getInstance()
     if family == "deribit_xbtusd":
         base_query = f'''SELECT last(sum_vol_entry) as vol_entry, last(sum_vol_exit) as vol_exit, last(f_spread) as fixed_spread , min(sum_vol)*last(f_spread) as min_vol_mult_fixed_spread
@@ -1115,17 +1529,29 @@ def get_avg_fixed_spreads(t0, t1, family="deribit_xbtusd"):
     else:
         result = None
 
-    if result != None:
+    if result is not None:
         df = pd.concat(result, axis=0)
-        idx_list = []
-        for idx in range(len(result)):
-            idx_list.append(str(df.index[idx]).split("'")[5])
+        idx_list = [str(df.index[idx]).split("'")[5] for idx in range(len(result))]
         df.reset_index(drop=True, inplace=True)
         df['strategy'] = idx_list
         return df
 
 
 def get_funding_for_symbol(t0, t1, exchange, symbol):
+    """
+    @brief Retrieve funding data for a specific symbol within a given time range.
+
+    This function queries the InfluxDB to obtain funding data for a specified symbol and exchange.
+    The query is performed over a time range extended by 8 hours before the start time and 16 hours
+    after the end time to ensure data continuity.
+
+    @param t0 The start time in milliseconds.
+    @param t1 The end time in milliseconds.
+    @param exchange The name of the exchange.
+    @param symbol The symbol for which funding data is requested.
+
+    @return A DataFrame containing the funding data for the specified symbol.
+    """
     connection = InfluxConnection.getInstance()
     base_query = f'''SELECT "funding" FROM "funding" WHERE ("exchange" = '{exchange}' AND "symbol" = '{symbol}') AND time >= {t0 - 1000 * 60 * 60 * 8}ms and time <= {t1 + 1000 * 60 * 60 * 16}ms'''
     result = connection.staging_client_spotswap_dataframe.query(base_query, epoch='ns')
@@ -1133,6 +1559,20 @@ def get_funding_for_symbol(t0, t1, exchange, symbol):
 
 
 def get_predicted_funding_for_symbol(t0, t1, exchange, symbol):
+    """
+    @brief Retrieve predicted funding data for a specific symbol within a given time range.
+
+    This function queries the InfluxDB to obtain predicted funding data for a specified symbol and exchange.
+    The query is performed over a time range extended by 8 hours before the start time and 16 hours
+    after the end time to ensure data continuity.
+
+    @param t0 The start time in milliseconds.
+    @param t1 The end time in milliseconds.
+    @param exchange The name of the exchange.
+    @param symbol The symbol for which predicted funding data is requested.
+
+    @return A DataFrame containing the predicted funding data for the specified symbol.
+    """
     connection = InfluxConnection.getInstance()
     base_query = f'''SELECT "funding" FROM "predicted_funding" WHERE ("exchange" = '{exchange}' AND "symbol" = '{symbol}') AND time >= {t0 - 1000 * 60 * 60 * 8}ms and time <= {t1 + 1000 * 60 * 60 * 16}ms'''
     result = connection.staging_client_spotswap_dataframe.query(base_query, epoch='ns')
@@ -1140,6 +1580,20 @@ def get_predicted_funding_for_symbol(t0, t1, exchange, symbol):
 
 
 def get_estimated_next_funding_for_symbol(t0, t1, exchange, symbol):
+    """
+    @brief Retrieve estimated next funding data for a specific symbol within a given time range.
+
+    This function queries the InfluxDB to obtain estimated next funding data for a specified symbol and exchange.
+    The query is performed over a time range extended by 8 hours before the start time and 16 hours
+    after the end time to ensure data continuity.
+
+    @param t0 The start time in milliseconds.
+    @param t1 The end time in milliseconds.
+    @param exchange The name of the exchange.
+    @param symbol The symbol for which estimated next funding data is requested.
+
+    @return A DataFrame containing the estimated next funding data for the specified symbol.
+    """
     connection = InfluxConnection.getInstance()
     base_query = f'''SELECT "funding" FROM "estimated_next_funding" WHERE ("exchange" = '{exchange}' AND "symbol" = '{symbol}') AND time >= {t0 - 1000 * 60 * 60 * 8}ms and time <= {t1 + 1000 * 60 * 60 * 16}ms'''
     result = connection.staging_client_spotswap_dataframe.query(base_query, epoch='ns')
@@ -1147,23 +1601,53 @@ def get_estimated_next_funding_for_symbol(t0, t1, exchange, symbol):
 
 
 def get_funding(t0, t1):
+    """
+    @brief Retrieve the total funding within a specified time interval.
+
+    This function queries the InfluxDB to calculate the total funding over a specified time interval.
+    The funding is aggregated by the 'environment' tag.
+
+    @param t0 The start time in milliseconds.
+    @param t1 The end time in milliseconds.
+
+    @return A DataFrame containing the total funding with the following columns:
+            - 'funding': The total funding value.
+            - 'account_name': The name of the account associated with the funding.
+
+            If no data is found, the function returns None.
+    """
     connection = InfluxConnection.getInstance()
     base_query = f'''SELECT sum(pnl) as funding FROM "mark_to_market_funding"
     WHERE  (time >= {t0}ms AND time <= {t1}ms )
     GROUP BY "environment" '''
     result = connection.prod_client_spotswap_dataframe.query(base_query, epoch='ns')
 
-    if result != None:
+    if result is not None:
         df = pd.concat(result, axis=0)
-        idx_list = []
-        for idx in range(len(result)):
-            idx_list.append(str(df.index[idx]).split("'")[5])
+        idx_list = [str(df.index[idx]).split("'")[5] for idx in range(len(result))]
         df.reset_index(drop=True, inplace=True)
         df['account_name'] = idx_list
         return df
 
 
 def get_deribit_implied_volatility(t0, t1):
+    """
+    @brief Retrieve Deribit implied volatility for BTC and ETH within a specified time interval.
+
+    This function queries the InfluxDB to obtain the implied volatility (dvol) for BTC and ETH
+    on the Deribit exchange within the specified time range. The query groups results by coin type.
+
+    @param t0 The start time in milliseconds.
+    @param t1 The end time in milliseconds.
+
+    @return A DataFrame containing the implied volatility data with the following columns:
+            - 'timestamp': The timestamp in seconds.
+            - 'Time': The original timestamp in datetime format.
+            - 'dvol_btc': The implied volatility for BTC.
+            - 'dvol_eth': The implied volatility for ETH.
+
+            If no data is found, the function returns an empty DataFrame.
+    """
     connection = InfluxConnection.getInstance()
     base_query = f"""SELECT "high" FROM "dvol" WHERE time >= {t0}ms and time <= {t1}ms  GROUP BY "coin" """
     result = connection.staging_client_spotswap_dataframe.query(base_query, epoch='ns')
@@ -1183,6 +1667,20 @@ def get_deribit_implied_volatility(t0, t1):
 
 def get_realtime_funding_values(t0: int = 1677978000000, t1: int = 1680048000000, exchange: str = 'Deribit',
                                 symbol: str = 'BTC-PERPETUAL', moving_average: int = 90):
+    """
+    @brief Retrieve real-time funding values with a moving average applied over a specified time interval.
+
+    This function queries the InfluxDB to obtain real-time funding values for a specified exchange and symbol.
+    A moving average is applied to the funding values over the given time range.
+
+    @param t0 The start time in milliseconds.
+    @param t1 The end time in milliseconds.
+    @param exchange The name of the exchange.
+    @param symbol The symbol for which real-time funding data is requested.
+    @param moving_average The window size for the moving average.
+
+    @return A DataFrame containing the real-time funding values with the moving average applied.
+    """
     connection = InfluxConnection.getInstance()
     base_query = f""" SELECT moving_average(mean("funding"), {moving_average})  AS funding FROM real_time_funding WHERE exchange = '{exchange}' AND symbol = '{symbol}' AND time >= {t0 - 1000 * 60 * 60 * 8}ms and time <= {t1 + 1000 * 60 * 60 * 2}ms  GROUP BY time(10s) fill(null) """
     result = connection.staging_client_spotswap_dataframe.query(base_query, epoch='ns')
@@ -1191,6 +1689,20 @@ def get_realtime_funding_values(t0: int = 1677978000000, t1: int = 1680048000000
 
 def funding_values_mark_to_market(t0: int = 0, t1: int = 0, exchange: str = None, symbol: str = None,
                                   environment: str = None):
+    """
+    @brief Retrieve funding values marked to market for a specified symbol within a given time range.
+
+    This function queries the InfluxDB to obtain funding values marked to market for a specified symbol
+    and exchange. The query varies based on the symbol type and environment.
+
+    @param t0 The start time in milliseconds.
+    @param t1 The end time in milliseconds.
+    @param exchange The name of the exchange.
+    @param symbol The symbol for which funding values are requested.
+    @param environment The environment to query ('production', 'staging').
+
+    @return A DataFrame containing the funding values marked to market for the specified symbol.
+    """
     connection = InfluxConnection.getInstance()
     if symbol == 'ETH-PERPETUAL':
         query = f''' SELECT "funding_rate" as "funding" FROM "mark_to_market_funding"
@@ -1211,8 +1723,8 @@ def funding_values_mark_to_market(t0: int = 0, t1: int = 0, exchange: str = None
         result = connection.staging_client_spotswap_dataframe.query(query, epoch='ns')
     else:
         result = None
-    # print(query)
     return result["mark_to_market_funding"]
+
 
 def create_price_dataframe_local_folder(t_start: int = 0,
                                         t_end: int = 0,
@@ -1222,26 +1734,22 @@ def create_price_dataframe_local_folder(t_start: int = 0,
                                         swap_symbol: str = 'ETHUSD',
                                         side: str = 'both'):
     """
-    Creates a pandas DataFrame by aggregating price data from files located in a specified local folder.
+    @brief Create a DataFrame by aggregating price data from local files within a specified time range.
 
-    This function scans a specified local directory for files containing price data, reads each of these files
-    into a pandas DataFrame, and then combines these DataFrames into a single DataFrame.
+    This function scans a local directory for files containing price data for the specified spot and swap
+    exchanges and symbols. It reads the data into pandas DataFrames, combines them, and returns the result.
 
-    Parameters:
-    - t_start (int): Start timestamp in milliseconds.
-    - t_end (int): End timestamp in milliseconds.
-    - spot_exchange (str): Exchange name for spot data.
-    - spot_symbol (str): Symbol for spot data.
-    - swap_exchange (str): Exchange name for swap data.
-    - swap_symbol (str): Symbol for swap data.
-    - side (str): Market side ('Bid', 'Ask', or 'both').
+    @param t_start The start timestamp in milliseconds.
+    @param t_end The end timestamp in milliseconds.
+    @param spot_exchange The exchange name for spot data (default: 'Deribit').
+    @param spot_symbol The symbol for spot data (default: 'ETH-PERPETUAL').
+    @param swap_exchange The exchange name for swap data (default: 'BitMEX').
+    @param swap_symbol The symbol for swap data (default: 'ETHUSD').
+    @param side The market side ('Bid', 'Ask', or 'both') (default: 'both').
 
-    Returns:
-    - Tuple of DataFrames (price_bid, price_ask) if side is 'both'.
-    - DataFrames (df1, df2) filtered by side otherwise.
+    @return A tuple of DataFrames (price_bid, price_ask) if side is 'both'.
+            If side is not 'both', returns DataFrames (df1, df2) filtered by the specified side.
     """
-
-    # Locate Base Directory
     base_dir = f"/home/equinoxai/data"
     if not os.path.isdir(base_dir):
         base_dir = os.path.normpath(
@@ -1253,7 +1761,6 @@ def create_price_dataframe_local_folder(t_start: int = 0,
     base_dir_spot = os.path.normpath(f"{base_dir}/prices/{spot_exchange}/{spot_symbol}")
     base_dir_swap = os.path.normpath(f"{base_dir}/prices/{swap_exchange}/{swap_symbol}")
 
-    # Convert start and end timestamps to datetime
     start_date = pd.to_datetime(t_start, unit='ms', utc=True)
     end_date = pd.to_datetime(t_end, unit='ms', utc=True)
 
@@ -1289,14 +1796,12 @@ def create_price_dataframe_local_folder(t_start: int = 0,
     df1['timems'] = timems_spot
     df2['timems'] = timems_swap
 
-    # Keep only prices that are after t_start and before t_end
     df1 = df1[(df1['timems'] <= t_end) & (df1['timems'] >= t_start)]
     df2 = df2[(df2['timems'] <= t_end) & (df2['timems'] >= t_start)]
 
     df1.drop_duplicates(subset=['timems', 'side'], keep='last', inplace=True)
     df2.drop_duplicates(subset=['timems', 'side'], keep='last', inplace=True)
 
-    ### Bid/Ask Entry/Exit
     if side == 'both':
         price_bid = pd.merge_ordered(df1[df1.side == 'Bid'].drop(columns=['side']),
                                      df2[df2.side == 'Bid'].drop(columns=['side']),
@@ -1323,22 +1828,23 @@ def sub_function(base_dir_spot: str = None,
                  data_list_spot: list = None,
                  data_list_swap: list = None):
     """
-    Fetch data from local storage or external source and append to existing data lists.
+    @brief Fetch data from local storage or external source and append to existing data lists.
 
-    Parameters:
-    - base_dir_spot (str): Base directory for spot data.
-    - base_dir_swap (str): Base directory for swap data.
-    - t_start (datetime): Start date.
-    - t_end (datetime): End date.
-    - spot_exchange (str): Exchange name for spot data.
-    - spot_symbol (str): Symbol for spot data.
-    - swap_exchange (str): Exchange name for swap data.
-    - swap_symbol (str): Symbol for swap data.
-    - data_list_spot (list): List to append spot data.
-    - data_list_swap (list): List to append swap data.
+    This function fetches spot and swap data from local files if they exist; otherwise, it queries data 
+    from an external source such as InfluxDB. The retrieved data is appended to the provided lists.
 
-    Returns:
-    - Updated data lists for spot and swap data.
+    @param base_dir_spot The base directory for spot data files.
+    @param base_dir_swap The base directory for swap data files.
+    @param t_start The start datetime for the data retrieval.
+    @param t_end The end datetime for the data retrieval.
+    @param spot_exchange The name of the exchange for spot data.
+    @param spot_symbol The symbol for the spot data.
+    @param swap_exchange The name of the exchange for swap data.
+    @param swap_symbol The symbol for the swap data.
+    @param data_list_spot A list to append the spot data.
+    @param data_list_swap A list to append the swap data.
+
+    @return A tuple containing updated data lists for spot and swap data.
     """
     temp_start, temp_end = convert_dates_to_timestamps(t_start, t_end)
     clipped_start = drop_hours_from_datetime_object(t_start)
@@ -1356,18 +1862,19 @@ def sub_function(base_dir_spot: str = None,
 
 def fetch_data(local_dir, t_start, t_end, exchange, symbol, data_list):
     """
-    Helper function to read parquet files or query data from an external source and append to existing data list.
+    @brief Helper function to read parquet files or query data from an external source.
 
-    Parameters:
-    - local_dir (str): Local directory path for the data file.
-    - t_start (int): Start timestamp in milliseconds.
-    - t_end (int): End timestamp in milliseconds.
-    - exchange (str): Exchange name.
-    - symbol (str): Symbol name.
-    - data_list (list): List to append the data.
+    This function attempts to read data from a local parquet file. If the file does not exist, it queries 
+    the data from InfluxDB. The data is then appended to the provided data list.
 
-    Returns:
-    - Updated data list.
+    @param local_dir The local directory path for the data file.
+    @param t_start The start timestamp in milliseconds for the data retrieval.
+    @param t_end The end timestamp in milliseconds for the data retrieval.
+    @param exchange The name of the exchange.
+    @param symbol The symbol of the financial instrument.
+    @param data_list The list to which the retrieved data will be appended.
+
+    @return The updated data list containing the fetched data.
     """
     if os.path.exists(local_dir):
         try:
@@ -1392,15 +1899,28 @@ def fetch_data(local_dir, t_start, t_end, exchange, symbol, data_list):
     return data_list
 
 
-
-
-
 def create_price_dataframe_from_influxdb(t_start: int = 0, t_end: int = 0,
                                          spot_exchange: str = 'Deribit',
                                          spot_symbol: str = 'ETH-PERPETUAL',
                                          swap_exchange: str = 'BitMEX',
                                          swap_symbol: str = 'ETHUSD',
                                          environment: str = 'staging'):
+    """
+    @brief Create price dataframes from InfluxDB for specified exchanges and symbols.
+
+    This function queries price data from InfluxDB for specified spot and swap exchanges and symbols 
+    within a given time range. It then processes the data to identify periods of missing data.
+
+    @param t_start The start timestamp in milliseconds.
+    @param t_end The end timestamp in milliseconds.
+    @param spot_exchange The name of the spot exchange.
+    @param spot_symbol The symbol for the spot exchange.
+    @param swap_exchange The name of the swap exchange.
+    @param swap_symbol The symbol for the swap exchange.
+    @param environment The environment to query ('staging', 'production').
+
+    @return A tuple containing two DataFrames: price_bid and price_ask.
+    """
     print(f"t_start= {t_start}, t_end= {t_end}")
     price1 = get_price(t_start=t_start, t_end=t_end, exchange=spot_exchange, symbol=spot_symbol, side='Ask',
                        environment=environment)
@@ -1468,35 +1988,58 @@ def get_data_for_trader(t_start, t_end, exchange_spot, spot_instrument, exchange
                         funding_options=None,
                         use_stored_bands=False):
     """
-    Variables in the function get_data_for_trader:
-    t_start  = start timestamp of the period in millis
-    t_end = end timestamp of the period in milliseconds
-    exchange_spot = spot exchange name
-    exchange_swap  = swap exchange name
-    spot_instrument = coin ticker in spot market
-    swap_instrument =  coin ticker in swap market
-    strategy =  the name of the strategy if we want to use the band values of a known strategy
-    area_spread_threshold =  the area spread parameter
-    environment = the environment form the data ar queried, staging or production
-    band_type = the type of the band, bogdan_bands, percentage_bands, ...
-    window_size = the window size parameter
-    entry_delta_spread  =  the entry delta spread parameter
-    exit_delta_spread =  the exit delta spread parameter
-    band_funding_system = funding system used in the creation of the band in the API, funding_adjusted_exit_band,
-    funding_adjusted_exit_band_with_drop
-    generate_percentage_bands =  boolean. If true percentage_bands are generated in the API, default=False
-    lookback = percentage band parameter
-    recomputation_time = percentage band parameter
-    target_percentage_entry = percentage band parameter
-    target_percentage_exit = percentage band parameter
-    entry_opportunity_source = percentage band parameter
-    exit_opportunity_source = percentage band parameter
-    use_aggregated_opportunity_points =
-    ending =
-    force_band_creation =  boolean, If True the bands are created in the API and values are writen in influxdb
-    move_bogdan_band = move the bands based on the Deribit funding
-    """
+    @brief Retrieve and prepare data required for trading decisions.
 
+    This function aggregates data required for executing trading strategies. It collects price data, 
+    computes bands for trading signals, and applies funding adjustments if necessary.
+
+    @param t_start The start timestamp in milliseconds for data retrieval.
+    @param t_end The end timestamp in milliseconds for data retrieval.
+    @param exchange_spot The name of the spot exchange.
+    @param spot_instrument The symbol for the spot market.
+    @param exchange_swap The name of the swap exchange.
+    @param swap_instrument The symbol for the swap market.
+    @param swap_fee The swap fee for the trading operation.
+    @param spot_fee The spot fee for the trading operation.
+    @param strategy The strategy name for which the data is being retrieved.
+    @param area_spread_threshold The threshold for area spread adjustment.
+    @param environment The environment from which to query data ('staging', 'production').
+    @param band_type The type of band to use ('percentage_band', 'bogdan_bands', etc.).
+    @param window_size The window size parameter for band calculation.
+    @param exit_delta_spread The exit delta spread for the strategy.
+    @param entry_delta_spread The entry delta spread for the strategy.
+    @param band_funding_system The funding system used for band creation.
+    @param hoursBeforeSwapList A list of hours before swap for funding calculations.
+    @param slowWeightSwapList A list of slow weights for swaps.
+    @param fastWeightSwapList A list of fast weights for swaps.
+    @param hoursBeforeSpotList A list of hours before spot for funding calculations.
+    @param slowWeightSpotList A list of slow weights for spots.
+    @param fastWeightSpotList A list of fast weights for spots.
+    @param generate_percentage_bands Flag to indicate whether to generate percentage bands.
+    @param lookback The lookback period for band calculations.
+    @param recomputation_time The recomputation time for percentage bands.
+    @param target_percentage_exit The target percentage for exit points.
+    @param target_percentage_entry The target percentage for entry points.
+    @param entry_opportunity_source The source for entry opportunity data.
+    @param exit_opportunity_source The source for exit opportunity data.
+    @param minimum_target The minimum target for trades.
+    @param use_aggregated_opportunity_points Flag to indicate use of aggregated opportunity points.
+    @param ending The ending criteria for trades.
+    @param force_band_creation Flag to force band creation even if existing data is available.
+    @param move_bogdan_band Option to move bogdan bands based on funding data.
+    @param use_bp Boolean indicating whether to use basis points for calculations.
+    @param window_size2 Secondary window size for band calculations.
+    @param exit_delta_spread2 Secondary exit delta spread for band calculations.
+    @param entry_delta_spread2 Secondary entry delta spread for band calculations.
+    @param band_funding_system2 Secondary funding system for band calculations.
+    @param funding_window The funding window size in hours.
+    @param funding_periods_lookback Number of periods to look back for funding adjustments.
+    @param slow_funding_window The slow funding window size.
+    @param funding_options Additional options for funding calculations.
+    @param use_stored_bands Flag to use stored bands instead of recalculating them.
+
+    @return A tuple containing the merged DataFrame with trading data and the strategy name.
+    """
     price_bid, price_ask = create_price_dataframe_local_folder(t_start=t_start,
                                                                t_end=t_end,
                                                                spot_exchange=exchange_spot,
@@ -1711,3 +2254,4 @@ def get_data_for_trader(t_start, t_end, exchange_spot, spot_instrument, exchange
         return df, str_name
     else:
         return df, None
+

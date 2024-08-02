@@ -1,0 +1,8 @@
+{
+    "docify.commentService.programmingLanguage": "python",
+    "docify.commentService.docstringFormat": "Doxygen",
+    "docify.commentService.sidePanelReviewMode": true,
+    "docify.translateService.programmingLanguage": "python",
+    "docify.translateService.docstringFormat": "Doxygen",
+    "docify.commentService.autoAccept": true
+}

@@ -41,6 +41,45 @@ client1 = DataFrameClient('influxdb',
 
 
 def set_latencies_auto(exchange_swap, exchange_spot):
+    """
+    @brief Determines optimal latencies for swap and spot exchanges based on location.
+
+    This function calculates and returns the optimal websocket and API latencies for a given swap and spot exchange. 
+    It utilizes a predefined latency structure for various exchanges across multiple geographical locations.
+
+    @param exchange_swap The name of the swap exchange. Supported exchanges include:
+    - 'Bybit'
+    - 'Deribit'
+    - 'BitMEX'
+    - 'Okex'
+    - 'HuobiDMSwap'
+    - 'Binance'
+    - 'Bitflyer'
+    - 'FTX'
+    - 'Bitstamp'
+    - 'WOO'
+    - 'DYDX'
+    - 'LMAX'
+    - 'Kraken'
+    @param exchange_spot The name of the spot exchange. Supported exchanges are the same as for exchange_swap.
+
+    @return A tuple containing:
+    - ws_swap: The optimal websocket latency for the swap exchange.
+    - api_swap: The optimal API latency for the swap exchange.
+    - ws_spot: The optimal websocket latency for the spot exchange.
+    - api_spot: The optimal API latency for the spot exchange.
+
+    @note The function automatically adjusts the exchange name from 'HoubiDM' to 'HuobiDMSwap' for consistency.
+
+    @throws KeyError If the specified exchange is not found in the predefined latency structures.
+    @throws ValueError If any of the input parameters are invalid.
+
+    @example
+    @code
+    ws_swap, api_swap, ws_spot, api_spot = set_latencies_auto('Bybit', 'Binance')
+    @endcode
+    """
+
     if exchange_swap == 'HoubiDM':
         exchange_swap = 'HuobiDMSwap'
     if exchange_spot == 'HuobiDM':
@@ -106,6 +145,54 @@ def set_latencies_auto(exchange_swap, exchange_spot):
 
 
 def exchange_fees(swap_exchange, swap_symbol, spot_exchange, spot_symbol):
+    """
+    @brief Retrieves the maker and taker fees for specific trading pairs on given exchanges.
+
+    This function looks up and returns the maker and taker fees associated with specific trading pairs on the 
+    specified swap and spot exchanges. It utilizes predefined fee structures for various exchanges and symbols.
+
+    @param swap_exchange The name of the exchange for the swap trading pair. Supported exchanges include:
+    - 'Binance'
+    - 'Okex'
+    - 'HuobiDMSwap'
+    - 'HuobiDMOTC'
+    - 'HuobiDM'
+    - 'FTX'
+    - 'FTX_OTC'
+    - 'Deribit'
+    - 'BitMEX'
+    - 'Bitflyer'
+    - 'Bitstamp'
+    - 'Bybit'
+    - 'DYDX'
+    - 'KrakenFutures'
+    - 'LMAX'
+    - 'WOO'
+    - 'AAX'
+    - 'B2C2'
+    - 'BTSE'
+    - 'Kraken'
+    @param swap_symbol The trading symbol for the swap exchange. Supported symbols are specific to each exchange,
+    and may include pairs like 'binance_futures_btcusdt', 'okex_btc-usd-swap', 'ADA-USD', etc.
+    @param spot_exchange The name of the exchange for the spot trading pair. This can be the same as swap_exchange or different.
+    @param spot_symbol The trading symbol for the spot exchange. Supported symbols are specific to each exchange,
+    and may include pairs like 'binance_spot_btcusdt', 'okex_eth-usdt', 'BTC-USD', etc.
+
+    @return A tuple consisting of:
+    - The maker fee for the specified swap trading pair.
+    - The taker fee for the specified spot trading pair.
+
+    @note Fees may be negative, indicating a rebate, or positive, indicating a cost.
+
+    @throws KeyError If the specified exchange or symbol is not found in the predefined fee structures.
+    @throws ValueError If any of the input parameters are invalid.
+
+    @example
+    @code
+    double maker_fee, taker_fee;
+    maker_fee, taker_fee = exchange_fees('Binance', 'binance_futures_btcusdt', 'Okex', 'okex_btc-usdt');
+    @endcode
+    """
     maker_fees = {
         'Binance': {'binance_futures_adausdt': -0.00002, 'binance_futures_avaxusdt': -0.00002,
                     'binance_futures_bnbusd': -0.00014, 'binance_futures_btcbusd': -0.00014,
@@ -236,6 +323,11 @@ def exchange_fees(swap_exchange, swap_symbol, spot_exchange, spot_symbol):
 
 
 def exchange_tick_size(swap_exchange, swap_symbol):
+    """
+     @brief Returns the tick size for a swap exchange and swap symbol. This is based on the number of bits per second and in the case of BitMEX the size is used to determine the length of the tick.
+     @param swap_exchange The exchange to use. Can be one of BTC ETH PERPETUAL SOFTWARE or BITMEX.
+     @param swap_symbol The swap symbol to use. Can be one of DRAFT_CHAN CURSOR BTC_SYM or SOL_CH
+    """
     tick_sizes = {
         'Deribit': {'BTC-PERPETUAL': 0.5, 'ETH-PERPETUAL': 0.05, 'SOL-PERPETUAL': 0.01},
         'BitMEX': {'DOGEUSD': 0.00001, 'DOGEUSDT': 0.00001, 'ETHUSD': 0.05, 'ETHUSDU20': 0.05, 'LINKUSD': 0.001,

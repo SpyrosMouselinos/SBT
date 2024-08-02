@@ -49,6 +49,43 @@ class DatalinkCreateBands:
                  ending: str = None,
                  days_in_millis: int = 1000 * 60 * 60 * 24 * 7,
                  use_bps=False):
+        """
+        @brief Initializes the FundingPlan object. This is a class method to be used by subclasses and should not be called directly
+        @param t_start The start time of the time range to be used.
+        @param t_end The end time of the time range to be used.
+        @param swap_exchange The exchange that will be swappable.
+        @param swap_symbol The symbol that will be swapped.
+        @param spot_exchange The exchange that will be spotted.
+        @param spot_symbol The symbol that will be used to exchange the spot exchange.
+        @param window_size The number of time windows in which the exchange will be sped.
+        @param entry_delta_spread
+        @param exit_delta_spread The spread of the spot spread.
+        @param swap_fee
+        @param spot_fee
+        @param generate_percentage_bands
+        @param funding_system
+        @param funding_window slow_ The number of periods that will be used for the recomputation of the fundering funding period.
+        @param funding_periods_lookback
+        @param slow_funding_window
+        @param environment
+        @param recomputation_time
+        @param entry_opportunity_source
+        @param exit_opportunity_source
+        @param target_percentage_entry
+        @param target_percentage_exit
+        @param lookback
+        @param minimum_target
+        @param use_aggregated_opportunity_points
+        @param hoursBeforeSwapList
+        @param slowWeightSwapList
+        @param fastWeightSwapList
+        @param hoursBeforeSpotList
+        @param slowWeightSpotList
+        @param fastWeightSpotList
+        @param ending
+        @param days_in_millis
+        @param use_bps
+        """
         self.environment = environment
 
         self.t0 = t_start
@@ -112,10 +149,14 @@ class DatalinkCreateBands:
         self.funding_system_spot_df.drop_duplicates(subset='hoursBefore', keep='last', inplace=True)
 
         # make sure that the last value of the hoursBefore is 0
+        # if self.unding_system_swap_df. hoursBefore. iloc 1
         if not self.funding_system_swap_df.hoursBefore.empty:
+            # Set the hoursBefore field to 0.
             if self.funding_system_swap_df.hoursBefore.iloc[-1] != 0:
                 self.funding_system_swap_df.hoursBefore.iloc[-1] = 0
+        # if the funding system spot is empty
         if not self.funding_system_spot_df.hoursBefore.empty:
+            # Set the hoursBefore field to 0.
             if self.funding_system_spot_df.hoursBefore.iloc[-1] != 0:
                 self.funding_system_spot_df.hoursBefore.iloc[-1] = 0
 
@@ -123,10 +164,19 @@ class DatalinkCreateBands:
 
         self.ending = ending
 
+        # The strategy name for this strategy.
         if self.ending != None:
             self.strategy_name = f"generic_{self.swap_name}_{self.swap_symbol}_{self.spot_name}_{self.spot_symbol}_{self.ending}"
 
-    def generate_bogdan_bands_from_query(self, entry_delta_spread=None, exit_delta_spread=None):
+    # Generate Bollinger bands from query. This is a wrapper around generate_bollinger_bands_from_query
+    def generate_bollinger_bands_from_query(self, entry_delta_spread=None, exit_delta_spread=None):
+        """
+         @brief Generate Bollinger bands from query. This is a generator function that can be used to generate a list of band names to be bought by the band_bollinger function
+         @param entry_delta_spread entry spread ( m / s )
+         @param exit_delta_spread exit spread ( m / s )
+         @return list of band names to be bought by the band_bollinger
+        """
+        # Set the entry and exit delta spread.
         if entry_delta_spread is None:
             entry_delta_spread = self.entry_delta_spread
             exit_delta_spread = self.exit_delta_spread
@@ -154,12 +204,19 @@ class DatalinkCreateBands:
         result = connection.staging_client_spotswap_dataframe.query(query_string)
         return result['price']
 
+    # Load bands from disk and store them in bands_dict. This is called after a call to load_bands
     def load_bands_from_disk(self):
+        """
+         @brief Load Bogdan bands from disk. If not found generate them and return them
+         @return pd. DataFrame with band
+        """
         base_dir = os.path.join(os.getenv("STORED_BANDS_DIR"), f"{self.spot_symbol}_{self.swap_symbol}")
+        # Create a directory if it doesn t exist.
         if not os.path.exists(base_dir):
             os.makedirs(base_dir)
         filename = os.path.join(base_dir,
                                 f"{self.t0}_{self.t1}_{self.window_size}_{self.spot_fee}_{self.swap_fee}.parquet.br")
+        # Returns a pandas. DataFrame containing the bands of the Bogdan band data.
         if os.path.exists(filename):
             print("")
             bands = pd.read_parquet(filename, engine="pyarrow")
@@ -178,14 +235,15 @@ class DatalinkCreateBands:
             bands["Exit Band"] = bands["Exit Band"] - self.exit_delta_spread
             return bands
 
-    def generate_bogdan_bands(self, from_time=None, to_time=None):
-        '''
-        function to create bands
-        * time should be given in milliseconds
-        * if environment = production then an additional argument corresponding to the ending of the strategy name
-        should be given
-        The function has a buffer so post-processing is needed for a clear-cut in terms of time.
-        '''
+    # Generate Bollinger bands. This is a wrapper around the band generation function
+    def generate_bollinger_bands(self, from_time=None, to_time=None):
+        """
+         @brief Generates bands based on funding system. Bollinger bands are defined as a set of time points that correspond to the times in which the strategy is applied.
+         @param from_time start time of the band generation in milliseconds
+         @param to_time end time of the band generation in milliseconds
+         @return list of dictionaries with keys : time_points : time points for each band in the
+        """
+        # Sets the from and to time.
         if from_time is None and to_time is None:
             from_time = self.t0
             to_time = self.t1
@@ -233,9 +291,11 @@ class DatalinkCreateBands:
                 "swap_fee": self.swap_fee,
                 "spot_fee": self.spot_fee}
 
+        # If the use_bps option is set to true the body will be used to use the BPS.
         if not self.use_bps:
             del body['use_bps']
         # print(f"body : {body}")
+        # This method is used to send a band and queue band creation request to the equinoxai. com
         if self.environment == 'production':
 
             try:
@@ -262,6 +322,7 @@ class DatalinkCreateBands:
             return send_post.json()
         elif self.environment == 'staging':
             attempts = 0
+            # Attempts to send a band creation request to the queue_band_creation API.
             while attempts < 10:
                 try:
                     send_post = requests.post(url="https://api.staging.equinoxai.com/strategies/queue_band_creation",
@@ -274,6 +335,7 @@ class DatalinkCreateBands:
                     send_post.raise_for_status()
                     print('status code: ', send_post.status_code)
                     print('bands are generated but not stored in influxdb')
+                    # If the post status code is 200 then break the loop until the post is 200.
                     if send_post.status_code == 200:
                         break
                     # Code here will only run if the request is successful
@@ -300,6 +362,7 @@ class DatalinkCreateBands:
 
             temp_id = send_post.json()['id']
             status = send_post.json()['status']
+            # send_post. json if status is queued
             if status != 'queued':
                 print(f'band generation failed {send_post.json()}')
                 exit()
@@ -307,6 +370,7 @@ class DatalinkCreateBands:
             api_status = 'not_found'
             time_start = int(time.time() * 1000)
             time_now = time_start
+            # This function is used to get band result data from the Staging API.
             while api_status != 'found' and time_now - time_start < 1000 * 60 * 60:
                 try:
                     get_data_from_api = requests.post(
@@ -329,15 +393,19 @@ class DatalinkCreateBands:
                 time.sleep(2)
                 time_now = int(time.time() * 1000)
 
+            # Returns a list of data from the API
             if api_status == 'found':
+                # This function is used to get the data from the API
                 if len(get_data_from_api.json()['data']) == 0:
                     print("empty array returned")
                     exit()
                 output_data = get_data_from_api.json()['data']
                 ### HotFix -- Remove any buffer data ###
                 filtered_output_data = []
+                # Add entry to filtered_output_data if the time between from_time and to_time are within the interval of the time range.
                 for entry in output_data:
                     time_in_int64 = entry[0]
+                    # Add entry to filtered_output_data if from_time time_in_int64 to_time.
                     if from_time <= time_in_int64 <= to_time:
                         filtered_output_data.append(entry)
                 return filtered_output_data
@@ -348,12 +416,14 @@ class DatalinkCreateBands:
             print("wrong environment input")
             exit()
 
+    # Generate spreads. This is a wrapper around generate_spreads that allows to pass a function to the constructor
     def generate_spreads(self):
-        '''
-        function to generate spreads one-off
-        this function requires the environment variable to be set to "staging"
-        also it has a sleep time of 5min in order for the spreads to be generated.
-        '''
+        """
+         @brief Generates spreads one-off based on environment. 
+         This function requires the environment variable to be set to staging.
+         Also it has a sleep time of 5min in order for the spreads to be generated.
+        """
+        # This method is used to generate a spread using the staging environment
         if self.environment == 'staging':
             body = {"exchange_1": self.swap_name,
                     "symbol_1": self.swap_symbol,
@@ -391,6 +461,8 @@ class DatalinkCreateBands:
             print('Not the correct environment parameter, environment should be set to "staging"')
 
 
+# This is a wrapper for FundingOptionsBandCreation
+# The reason we need this is because of the need to create a band in order to get the funding
 class FundingOptionsBandCreation():
 
     def __init__(self, t_start: int = 1667260800000, t_end: int = 1669766400000,
@@ -414,6 +486,36 @@ class FundingOptionsBandCreation():
                  hoursBeforeSpotList: list = None,
                  slowWeightSpotList: list = None,
                  fastWeightSpotList: list = None):
+        """
+        @brief Initialize the FundingModel. Must be called before any other method. It is recommended to call super (). __init__ () as first argument to avoid having to re - initialize the model in the same way as the constructor.
+        @param t_start Start time of the time range in seconds.
+        @param t_end End time of the time range in seconds.
+        @param band_funding_option Band funding option to use.
+        @param window_size_net Window size of the net.
+        @param entry_delta_spread_net_entry Spread in time of the entry spread.
+        @param exit_delta_spread_net_exit Spread in time of the exit spread.
+        @param band_funding_system_net Baseline of the funding system.
+        @param window_size_zero Number of entries to use when the window size is zero.
+        @param entry_delta_spread_entry_zero Spread in time of the entry spread.
+        @param exit_delta_spread_exit_zero Spread in time of the exit spread.
+        @param band_funding_system_zero
+        @param funding_window
+        @param funding_periods_lookback
+        @param slow_funding_window
+        @param swap_exchange
+        @param swap_symbol
+        @param spot_exchange
+        @param spot_symbol
+        @param swap_fee
+        @param spot_fee
+        @param environment
+        @param hoursBeforeSwapList
+        @param slowWeightSwapList
+        @param fastWeightSwapList
+        @param hoursBeforeSpotList
+        @param slowWeightSpotList
+        @param fastWeightSpotList
+        """
 
         self.t0 = t_start
         self.t1 = t_end
@@ -445,6 +547,7 @@ class FundingOptionsBandCreation():
         self.slowWeightSpotList = slowWeightSpotList
         self.fastWeightSpotList = fastWeightSpotList
 
+        # if band_funding_option option1 option2 option3 option4 option5 option5 option6 option7 option5 option6 option7 option5 option6
         if self.band_funding_option == 'option1':
             self.band_funding1 = 'funding_both_sides_no_netting_worst_case'
             self.band_funding2 = 'funding_both_sides_no_netting_worst_case'
@@ -467,8 +570,14 @@ class FundingOptionsBandCreation():
             # do not override the band_funding1 and band_funding2
             pass
 
+    # Create a band from API. This is a wrapper around the create_band_from_api
     def create_band_from_api(self):
+        """
+         @brief Create and return a DatalinkCreateBands object from the API data.
+         @return A : class : ` ~gwpy. baselib. DatalinkCreateBands `
+        """
         days_in_milliseconds = 1000 * 60 * 60 * 24 * 7
+        # window size of the window.
         if self.window_size2 is not None:
             ws = max(self.window_size1, self.window_size2)
         else:
@@ -490,6 +599,7 @@ class FundingOptionsBandCreation():
                                         fastWeightSpotList=self.fastWeightSpotList, days_in_millis=days_in_milliseconds)
 
         bands_normal = datalink1.generate_bogdan_bands()
+        # Returns band_values for the band_funding option.
         if self.band_funding_option is None:
             return format_band_values(bands_normal)
         else:
@@ -522,8 +632,18 @@ class FundingOptionsBandCreation():
             return band_values
 
 
+# Format band values for output. This is a function that can be used to format a band value for each band in the data set
 def format_band_values(band_list, col_entry: str = 'Entry Band', col_exit: str = 'Exit Band', get_dates: bool = True):
+    """
+     @brief Formats band values to be used in plotting. This is a helper function to create a DataFrame that can be plotted to visualize the list of bands and to visualize the entries and exits in the band.
+     @param band_list A list of band values as returned by : func : ` get_band_list `.
+     @param col_entry The column to use for the entry band. Defaults to'Entry Band '. If this is set to False it will not be displayed.
+     @param col_exit The column to use for the exit band. Defaults to'Exit Band '. If this is set to False it will not be displayed.
+     @param get_dates If True the dates will be converted to milliseconds since January 1 1970.
+     @return A DataFrame with the band values formatted to be used in plotting
+    """
     band_values = pd.DataFrame(band_list, columns=['timems', 'side', 'value'])
+    # If get_dates is True then the band_values Time is set to the time of the band.
     if get_dates:
         band_values['Time'] = pd.to_datetime(band_values['timems'], unit='ms', utc=True)
     band_values[col_entry] = band_values.loc[band_values['side'] == 'entry', 'value']

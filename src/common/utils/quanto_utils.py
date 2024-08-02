@@ -9,9 +9,17 @@ from datetime import timedelta
 warnings.filterwarnings("ignore")
 load_dotenv(find_dotenv())
 
-
 def bitmex_btc_prices(t0, t1, environment, split_data=True):
-    #  download the bitmex xbtusd prices
+    """
+    Downloads and calculates average prices for BitMEX XBTUSD (Bitcoin) over a specified time interval.
+
+    @param t0 Start time in milliseconds.
+    @param t1 End time in milliseconds.
+    @param environment The environment from which data is fetched (e.g., production, staging).
+    @param split_data Boolean indicating whether to split data by date (default is True).
+
+    @return DataFrame containing merged prices (ask, bid, and average) with timestamps for BitMEX XBTUSD.
+    """
     bitmex_btc_ask = get_price(t_start=t0, t_end=t1, exchange='BitMEX', symbol='XBTUSD', side='Ask',
                                environment=environment, split_data=split_data)
     bitmex_btc_ask['Time'] = bitmex_btc_ask.index
@@ -20,13 +28,21 @@ def bitmex_btc_prices(t0, t1, environment, split_data=True):
     bitmex_btc_bid['Time'] = bitmex_btc_bid.index
 
     bitmex_btc_price = pd.merge_ordered(bitmex_btc_ask, bitmex_btc_bid, on='Time', suffixes=['_ask', '_bid'])
-    # drop the lines where the ask price is lower than the bid price
     bitmex_btc_price.reset_index(drop=True, inplace=True)
     bitmex_btc_price['price'] = bitmex_btc_price[['price_ask', 'price_bid']].mean(axis=1)
     return bitmex_btc_price
 
 
 def bitmex_btc_ask_prices(t0, t1, environment):
+    """
+    Downloads the ask prices for BitMEX XBTUSD (Bitcoin) over a specified time interval.
+
+    @param t0 Start time in milliseconds.
+    @param t1 End time in milliseconds.
+    @param environment The environment from which data is fetched (e.g., production, staging).
+
+    @return DataFrame containing ask prices with timestamps for BitMEX XBTUSD.
+    """
     bitmex_btc_ask = get_price(t_start=t0, t_end=t1, exchange='BitMEX', symbol='XBTUSD', side='Ask',
                                environment=environment)
     bitmex_btc_ask['Time'] = bitmex_btc_ask.index
@@ -34,7 +50,16 @@ def bitmex_btc_ask_prices(t0, t1, environment):
 
 
 def bitmex_eth_prices(t0, t1, environment, split_data=True):
-    # download the bitmex ethusd prices
+    """
+    Downloads and calculates average prices for BitMEX ETHUSD (Ethereum) over a specified time interval.
+
+    @param t0 Start time in milliseconds.
+    @param t1 End time in milliseconds.
+    @param environment The environment from which data is fetched (e.g., production, staging).
+    @param split_data Boolean indicating whether to split data by date (default is True).
+
+    @return DataFrame containing merged prices (ask, bid, and average) with timestamps for BitMEX ETHUSD.
+    """
     bitmex_eth_ask = get_price(t_start=t0, t_end=t1, exchange='BitMEX', symbol='ETHUSD', side='Ask',
                                environment=environment, split_data=split_data)
     bitmex_eth_ask['Time'] = bitmex_eth_ask.index
@@ -49,7 +74,15 @@ def bitmex_eth_prices(t0, t1, environment, split_data=True):
 
 
 def bitmex_eth_ask_prices(t0, t1, environment):
-    # download the bitmex ethusd prices
+    """
+    Downloads the ask prices for BitMEX ETHUSD (Ethereum) over a specified time interval.
+
+    @param t0 Start time in milliseconds.
+    @param t1 End time in milliseconds.
+    @param environment The environment from which data is fetched (e.g., production, staging).
+
+    @return DataFrame containing ask prices with timestamps for BitMEX ETHUSD.
+    """
     bitmex_eth_ask = get_price(t_start=t0, t_end=t1, exchange='BitMEX', symbol='ETHUSD', side='Ask',
                                environment=environment)
     bitmex_eth_ask['Time'] = bitmex_eth_ask.index
@@ -57,7 +90,16 @@ def bitmex_eth_ask_prices(t0, t1, environment):
 
 
 def track_average_price(cum_volume, sum_vol_price, volume, price):
-    # find the weighted average of price
+    """
+    Calculates the weighted average price based on cumulative volume and sum of volume-weighted prices.
+
+    @param cum_volume The cumulative volume.
+    @param sum_vol_price The sum of volume-weighted prices.
+    @param volume The current trade volume.
+    @param price The current trade price.
+
+    @return The weighted average price.
+    """
     if cum_volume != 0:
         sum_vol_price = sum_vol_price + volume * price
         w_avg_price = sum_vol_price / cum_volume
@@ -67,23 +109,59 @@ def track_average_price(cum_volume, sum_vol_price, volume, price):
 
 
 def coin_volume_func(cum_volume, weighted_average):
-    # find the volume of the underlying coin
+    """
+    Calculates the volume of the underlying coin based on cumulative volume and weighted average price.
+
+    @param cum_volume The cumulative volume.
+    @param weighted_average The weighted average price.
+
+    @return The volume of the underlying coin.
+    """
     return cum_volume / weighted_average
 
 
 def quanto_pnl_func(price_eth, avg_price_eth, price_btc, avg_price_btc, coin_volume):
-    # compute the quanto loss
+    """
+    Computes the Quanto PnL (Profit and Loss) based on price changes in ETH and BTC.
+
+    @param price_eth Current ETH price.
+    @param avg_price_eth Average ETH price.
+    @param price_btc Current BTC price.
+    @param avg_price_btc Average BTC price.
+    @param coin_volume Volume of the underlying coin.
+
+    @return The computed Quanto PnL.
+    """
     return (price_eth - avg_price_eth) * (price_btc - avg_price_btc) * 0.000001 * coin_volume
 
 
 def quanto_pnl_func_exp(price_eth, avg_price_eth, price_btc, avg_price_btc, coin_volume, exp1, exp2):
-    # compute the quanto loss
+    """
+    Computes the expanded Quanto PnL using power functions for ETH and BTC price changes.
+
+    @param price_eth Current ETH price.
+    @param avg_price_eth Average ETH price.
+    @param price_btc Current BTC price.
+    @param avg_price_btc Average BTC price.
+    @param coin_volume Volume of the underlying coin.
+    @param exp1 Exponent for ETH price change.
+    @param exp2 Exponent for BTC price change.
+
+    @return The computed expanded Quanto PnL.
+    """
     return pow(abs(price_eth - avg_price_eth), exp1) * pow(abs(price_btc - avg_price_btc), exp2) * 0.000001 * \
         coin_volume * np.sign(price_btc - avg_price_btc) * np.sign(price_eth - avg_price_eth)
 
 
 def recompute_band_value(band_value, quanto_loss):
-    # recompute the exit band value
+    """
+    Recomputes the exit band value based on the Quanto loss.
+
+    @param band_value The current band value.
+    @param quanto_loss The computed Quanto loss.
+
+    @return The recomputed band value.
+    """
     if quanto_loss < 0:
         return band_value + abs(quanto_loss)
     else:
@@ -91,6 +169,14 @@ def recompute_band_value(band_value, quanto_loss):
 
 
 def get_boxes(df, bp):
+    """
+    Creates boxes of price data for analysis based on a specified basis point range.
+
+    @param df DataFrame containing trade data with prices and sizes.
+    @param bp The basis point range for box creation.
+
+    @return DataFrame with boxes containing start and end times, limits, volumes, and trade counts.
+    """
     center_price = df.price.iloc[0]
     upper_limit = center_price + bp / 10000 * center_price
     lower_limit = center_price - bp / 10000 * center_price
@@ -142,6 +228,14 @@ def get_boxes(df, bp):
 
 
 def normalise(df, window=1):
+    """
+    Normalizes the counts of box trades over a specified window period.
+
+    @param df DataFrame containing box data with trade counts.
+    @param window Window size in hours for normalization (default is 1 hour).
+
+    @return DataFrame with normalized EMA (Exponential Moving Average) counts.
+    """
     normalized_df = df.copy(deep=True)
     for j in range(len(df)):
         start_date = df.iloc[j].end_time - timedelta(hours=window)
@@ -155,6 +249,17 @@ def normalise(df, window=1):
 
 
 def get_price_box_signal(t0, t1, basis_point, aggr_window, span):
+    """
+    Retrieves trade data and calculates box signals based on price movements for BitMEX ETHUSD.
+
+    @param t0 Start time in milliseconds.
+    @param t1 End time in milliseconds.
+    @param basis_point The basis point range for box creation.
+    @param aggr_window Aggregation window for grouping trades (e.g., '1H' for 1 hour).
+    @param span Span for the Exponential Moving Average (EMA) calculation.
+
+    @return DataFrame with aggregated box counts and EMA signals over the specified window.
+    """
     influx = InfluxConnection.getInstance()
     influx_staging = influx.archival_client_spotswap_dataframe
     trades = influx_staging.query(f"SELECT price, size, side FROM trade WHERE "

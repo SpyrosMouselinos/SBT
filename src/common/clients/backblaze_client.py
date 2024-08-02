@@ -15,8 +15,13 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
 
+# Creates a BackblazeClient to interact with the server. It is up to the caller to ensure that the client is ready
 class BackblazeClient:
+    
     def __init__(self):
+        """
+         @brief Initialize class variables and set default values. This is called by __init__
+        """
         self.authorize_account_url = "https://api.backblazeb2.com/b2api/v2/b2_authorize_account"
         self.id_and_key = f"{os.getenv('BACKBLAZE_KEY_ID')}:{os.getenv('BACKBLAZE_KEY_SECRET')}"
 
@@ -31,6 +36,9 @@ class BackblazeClient:
         self.bucket_name = "equinoxai-trades-db"
 
     def authorize(self):
+        """
+         @brief Authorize the account and get the account_id api_url and authorization_token
+        """
         request = urllib2.Request(
             url=self.authorize_account_url,
             headers=self.headers
@@ -44,6 +52,11 @@ class BackblazeClient:
         self.download_url = response_data["downloadUrl"]
 
     def get_bucket_id(self, bucket_name):
+        """
+         @brief Get the ID of the bucket to which the user has access. This is used to determine which equinoxai bucket is the default for the user's account
+         @param bucket_name The name of the bucket to which the user has access
+         @return The ID of the
+        """
         request = requests.post(
             url=f"{self.api_url}/b2api/v2/b2_list_buckets",
             data=json.dumps({"accountId": self.account_id}),
@@ -53,13 +66,20 @@ class BackblazeClient:
         response_data = json.loads(request.text)
         buckets = response_data["buckets"]
         bucket_id = None
+        # The bucket name of the equinoxai trades db
         for bucket in buckets:
+            # The bucket name of the bucket
             if bucket["bucketName"] == "equinoxai-trades-db":
                 self.bucket_name = bucket_name
                 return bucket["bucketId"]
         return bucket_id
 
     def get_simulations(self, bucket_id):
+        """
+         @brief Get a list of simulations that have been uploaded to S3. This is useful for debugging and to check if the user has access to a bucket's file system
+         @param bucket_id The ID of the bucket to query
+         @return A list of tuples ( uploadTimestamp fileName ) for each
+        """
         request = requests.post(
             url=f"{self.api_url}/b2api/v2/b2_list_file_names",
             data=json.dumps({"bucketId": bucket_id, "prefix": "simulations", "maxFileCount": 10000}),
@@ -69,11 +89,17 @@ class BackblazeClient:
         response_data = json.loads(request.text)
         files = response_data["files"]
         simulations = []
+        # Add simulations to the simulation list
         for file in files:
             simulations.append([file['uploadTimestamp'], file["fileName"].split("/")[1]])
         return simulations
 
     def download_simulation(self, filename):
+        """
+         @brief Download a simulation from S3. This is a wrapper around the : py : meth : ` ~google. cloud. s3. S3Client. download ` method.
+         @param filename Name of the file to download. Must be unique among simulations
+         @return DataFrame with the simulation
+        """
         request = requests.get(
             url=f"{self.download_url}/file/{self.bucket_name}/simulations/{filename}",
             data=None,
@@ -84,6 +110,11 @@ class BackblazeClient:
         return response
 
     def download_transfers(self, filename):
+        """
+         @brief Download a file from S3 and return it as a Pandas dataframe. This is a wrapper around requests.
+         @param filename The name of the file to download.
+         @return A Pandas dataframe containing the file's contents and metadata
+        """
         request = requests.get(
             url=f"{self.download_url}/file/{self.bucket_name}/transfers/{filename}",
             data=None,
@@ -94,6 +125,12 @@ class BackblazeClient:
         return response
 
     def delete_simulation(self, filename, file_id):
+        """
+         @brief Deletes a simulation from B2. This is a convenience method for deleting a simulation that was created by : meth : ` create_simulation `.
+         @param filename The name of the simulation to delete. This must be a file name and not an absolute path.
+         @param file_id The ID of the file that was created by : meth : ` create_simulation `.
+         @return The JSON response from the API as a dictionary. Example request **. :
+        """
         request = requests.post(
             url=f"{self.api_url}/b2api/v2/b2_delete_file_version",
             data=json.dumps({"fileName": filename, "fileId": file_id}),
@@ -103,9 +140,17 @@ class BackblazeClient:
         return response_data
 
     def list_file_versions(self, start_file_id, start_file_name, prefix="simulations/"):
+        """
+        @brief List versions of files in equinoxai trades. This is a list of file versions that have been uploaded to B2.
+        @param start_file_id ID of the first file to list ( optional ). If None list all versions. Default : None
+        @param start_file_name Name of the first file to list ( optional ). If None list all versions. Default : None
+        @param prefix Prefix to filter files by default simulations /
+        @return requests. Response -- requests response from B2 API
+        """
 
         bucket_id = self.get_bucket_id("equinoxai-trades-db")
         request = None
+        # list of file versions for the current bucket
         if start_file_id:
             request = requests.post(
                 url=f"{self.api_url}/b2api/v2/b2_list_file_versions",
@@ -124,6 +169,11 @@ class BackblazeClient:
         return response_data["files"]
 
     def get_upload_url(self, bucket_id):
+        """
+         @brief Get the upload URL for a bucket. This is used to upload files to S3
+         @param bucket_id The ID of the bucket
+         @return The URL that you can use to upload
+        """
         request = requests.post(
             url=f"{self.api_url}/b2api/v2/b2_get_upload_url",
             data=json.dumps({"bucketId": bucket_id}),
@@ -136,7 +186,14 @@ class BackblazeClient:
         return
 
     def upload_simulation(self, filename, df):
+        """
+         @brief Upload simulation to backblaze. This will be used to upload data to backblaze
+         @param filename Name of file to upload
+         @param df Dataframe containing simulation data in csv format.
+         @return A string with upload headers. Example : upload_simulation ("simulation.csv")
+        """
         print(f"Uploading file {filename} to backblaze")
+        # If the data is a pandas. DataFrame then this is a pandas. DataFrame.
         if type(df) != pd.DataFrame:
             try:
                 df = pd.DataFrame(data=df)
@@ -144,6 +201,7 @@ class BackblazeClient:
                 df = pd.DataFrame(data=df, index=[0])
         file_data = self.dataframe_to_file_data(dataframe=df)
         sha1_of_file_data = hashlib.sha1(file_data).hexdigest()
+        # filename is a month name or month name
         if "+" in filename:  # if has month in id
             month = filename.split("+")[0]
             filename = f"{month}/{filename}"
@@ -163,7 +221,14 @@ class BackblazeClient:
         return response_data
 
     def upload_tranfers(self, filename, df):
+        """
+         @brief Upload file to backblaze and return file id. This method is used to upload files to backblaze
+         @param filename name of file to upload
+         @param df data frame containing file data. Can be a dataframe or a string
+         @return unique id of file
+        """
         print(f"Uploading file {filename} to backblaze")
+        # If the data is a pandas. DataFrame then this is a pandas. DataFrame.
         if type(df) != pd.DataFrame:
             try:
                 df = pd.DataFrame(data=df)
@@ -171,6 +236,7 @@ class BackblazeClient:
                 df = pd.DataFrame(data=df, index=[0])
         file_data = self.dataframe_to_file_data(dataframe=df)
         sha1_of_file_data = hashlib.sha1(file_data).hexdigest()
+        # filename is a month name or month name
         if "+" in filename:  # if has month in id
             month = filename.split("+")[0]
             filename = f"{month}/{filename}"
@@ -190,6 +256,12 @@ class BackblazeClient:
         return response_data
 
     def upload_parameters(self, filename, df):
+        """
+         @brief Upload parameter optimization to backblaze. This is a method to be used in order to upload parameters to backblaze
+         @param filename Name of the file to upload
+         @param df Dataframe containing the parameters to upload. It must have columns'name'and'description '
+         @return A json object containing the response_data that was
+        """
         print(f"Uploading file {filename} to backblaze")
         print(df.describe())
         file_data = self.dataframe_to_file_data(dataframe=df)
@@ -210,6 +282,11 @@ class BackblazeClient:
         return response_data
 
     def download_parameters(self, filename):
+        """
+         @brief Download parameters from S3 and return them as a Pandas dataframe. This is a wrapper around the requests. get method that allows you to download parameters from S3 without having to re - open the connection
+         @param filename Name of file to download
+         @return DataFrame of parameters in CSV format ( for convenience and read
+        """
         request = requests.get(
             url=f"{self.download_url}/file/{self.bucket_name}/parameter_optimization/{filename}",
             data=None,
@@ -249,11 +326,22 @@ class BackblazeClient:
                                 prefix="",
                                 time_from=datetime.datetime.strptime("01/01/22 09:55:00", '%d/%m/%y %H:%M:%S'),
                                 time_to=datetime.datetime.strptime("31/12/22 10:40:00", '%d/%m/%y %H:%M:%S')):
+        """
+        @brief Get simulations by name and date. This method is used to get all simulations that match the prefix and have a name and date in the time range
+        @param bucket The bucket to use for the query
+        @param b2 The Boto3 client to use for the query
+        @param prefix The prefix to filter the results by. Default is " "
+        @param time_from The start date of the time range. Default is 00 / 01 / 22 09 : 55 : 00
+        @param time_to The end date of the time range. Default is 31 / 12 / 22 10 : 40 : 00
+        @return A list of keys that match the filter. Example :
+        """
         try:
             response = b2.Bucket(bucket).objects.filter(Prefix=f'simulations/{prefix}')
             files = []
+            # iterate over the response and add files to files list
             for file in response:  # iterate over response
                 # compare dates
+                # Add a file to the list of files if the time_from and time_to are older than the time_from. timestamp
                 if time_from.timestamp() < file.last_modified.timestamp() < time_to.timestamp():
                     files.append({"filename": file.key, "time": file.last_modified})
             cols = ["filename", "time"]
