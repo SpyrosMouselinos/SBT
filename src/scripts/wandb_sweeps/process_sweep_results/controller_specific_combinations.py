@@ -32,7 +32,7 @@ schedule_list = []
 def schedule(controller, run):
     """Schedule a run with the given controller.
 
-    This function initiates a scheduling action by first ensuring that the
+    This function initiates a scheduling action by ensuring that the
     controller is started. It generates a unique schedule ID and logs the
     action with the parameters from the run configuration. The schedule
     information is then appended to a global schedule list, which is also
@@ -155,6 +155,9 @@ def combinations_loop(param_lst=None, sweep=None):
     Args:
         param_lst (list): A list of parameter combinations to be scheduled.
         sweep (object): An object responsible for managing the scheduling process.
+
+    Returns:
+        None: This function does not return a value.
     """
 
     for combination in param_lst:
@@ -507,11 +510,13 @@ def xbtusd_combinations_own():
 def xbtusd_combinations_nickel():
     """Generate a list of trading combinations for XBT/USD.
 
-    This function creates a list of dictionaries, each representing a unique
-    combination of trading parameters for XBT/USD. Each dictionary contains
-    various parameters such as window sizes, delta spreads, funding options,
-    and maximum position and trade volume limits. The generated combinations
-    can be used for trading strategy simulations or analysis.
+    This function creates a comprehensive list of dictionaries, where each
+    dictionary represents a unique combination of trading parameters for the
+    XBT/USD trading pair. The parameters include various window sizes, delta
+    spreads for both entry and exit, funding options, and limits on maximum
+    position and trade volume. These combinations are essential for traders
+    looking to simulate or analyze different trading strategies in the
+    XBT/USD market.
 
     Returns:
         list: A list of dictionaries, each containing trading parameters for
@@ -649,7 +654,8 @@ def xbtusd_production_params(file_name: str = None, band_funding_system: str = N
     XBTUSD, maps the real parameters to simulation parameters, and then
     returns the processed parameters. The function takes optional arguments
     to specify different band funding systems that can be used in the
-    processing.
+    processing. The resulting DataFrame contains the relevant parameters
+    needed for further analysis or simulation.
 
     Args:
         file_name (str): The name of the CSV file containing production parameters.
@@ -668,17 +674,17 @@ def xbtusd_production_params(file_name: str = None, band_funding_system: str = N
 def btc_production_params(file_name: str = None, band_funding_system: str = None, band_funding_system2: str = None):
     """Retrieve Bitcoin production parameters from a CSV file.
 
-    This function reads a CSV file containing production parameters for
-    Bitcoin, maps the real parameters to simulation parameters, and then
-    retrieves the relevant parameters for the Deribit maker based on the
-    specified funding systems. It is designed to facilitate the analysis and
-    simulation of Bitcoin production scenarios by providing a structured
-    output of the necessary parameters.
+    This function reads a specified CSV file that contains production
+    parameters for Bitcoin. It maps the real parameters to simulation
+    parameters and retrieves the relevant parameters specifically for the
+    Deribit maker, based on the provided funding systems. This is
+    particularly useful for analysts and developers who need structured data
+    for simulating and analyzing various Bitcoin production scenarios.
 
     Args:
-        file_name (str?): The name of the CSV file containing production parameters.
-        band_funding_system (str?): The first band funding system to be used.
-        band_funding_system2 (str?): The second band funding system to be used.
+        file_name (str): The name of the CSV file containing production parameters.
+        band_funding_system (str): The first band funding system to be used.
+        band_funding_system2 (str): The second band funding system to be used.
 
     Returns:
         DataFrame: A DataFrame containing the mapped production parameters for Bitcoin.
@@ -704,7 +710,7 @@ def ethusd_production_params(file_name: str = None, band_funding_system: str = N
         band_funding_system (str?): The funding system to be used for parameter retrieval.
 
     Returns:
-        The processed parameters for ETH/USD based on the input data and funding
+        DataFrame: The processed parameters for ETH/USD based on the input data and funding
             system.
     """
 
