@@ -30,6 +30,23 @@ schedule_list = []
 
 
 def schedule(controller, run):
+    """Schedule a run with the given controller.
+
+    This function initiates a scheduling action by first ensuring that the
+    controller is started. It generates a unique schedule ID and logs the
+    action with the parameters from the run configuration. The schedule
+    information is then appended to a global schedule list, which is also
+    updated in the controller's internal state.
+
+    Args:
+        controller (Controller): The controller instance responsible for managing
+            the scheduling process.
+        run (Run): An instance containing the configuration for the run to be scheduled.
+
+    Returns:
+        None: This function does not return a value.
+    """
+
     global schedule_list
     controller._start_if_not_started()
     schedule_id = generate_id()
@@ -58,6 +75,34 @@ def start(sweep_id, source_sweep_id, select_num_simulations, custom_filter=param
           file_name: str = params['file_name'],
           band_funding_system: str = params["band_funding_system"],
           band_funding_system2: str = params["band_funding_system"]):
+    """Start a sweep for simulations based on specified parameters.
+
+    This function initiates a sweep using the Weights and Biases (wandb)
+    library. It connects to the wandb server, retrieves the specified sweep,
+    and runs simulations based on the provided filters and parameters.
+    Depending on the `custom_filter` value, it can rerun simulations from a
+    source sweep or generate combinations of parameters for different
+    symbols. The function also handles various cases for production and
+    simulation results, ensuring that the appropriate combinations are
+    processed.
+
+    Args:
+        sweep_id (str): The ID of the sweep to start.
+        source_sweep_id (str or None): The ID of the source sweep to rerun simulations from, if applicable.
+        select_num_simulations (int): The number of simulations to select from the source sweep.
+        custom_filter (str?): A filter to customize the simulation parameters. Defaults to
+            params['custom_filter'].
+        project_name (str?): The name of the project in wandb. Defaults to params['project_name'].
+        symbol (str?): The trading symbol for which to run simulations. Defaults to
+            params['symbol'].
+        file_name (str?): The name of the file containing relevant data. Defaults to
+            params['file_name'].
+        band_funding_system (str?): The first band funding system parameter. Defaults to
+            params["band_funding_system"].
+        band_funding_system2 (str?): The second band funding system parameter. Defaults to
+            params["band_funding_system"].
+    """
+
     wandb.login(host=os.getenv("WANDB_HOST"))
     try:
         sweep = wandb.controller(sweep_id, project=project_name, entity=WANDB_ENTITY)
@@ -99,6 +144,19 @@ def start(sweep_id, source_sweep_id, select_num_simulations, custom_filter=param
 
 
 def combinations_loop(param_lst=None, sweep=None):
+    """Schedule combinations of parameters using a loop.
+
+    This function iterates over a list of parameter combinations, creates a
+    Combination object for each combination, and schedules it. After
+    scheduling, it prints the status of the sweep and logs the configuration
+    of each scheduled combination. Finally, it provides feedback on the
+    completion of the selection process and the length of the input list.
+
+    Args:
+        param_lst (list): A list of parameter combinations to be scheduled.
+        sweep (object): An object responsible for managing the scheduling process.
+    """
+
     for combination in param_lst:
         c = Combination(combination, sweep)
         schedule(sweep, c)
@@ -109,6 +167,21 @@ def combinations_loop(param_lst=None, sweep=None):
 
 
 def combinations():
+    """Generate a list of configuration combinations for a trading strategy.
+
+    This function returns a list of dictionaries, where each dictionary
+    represents a unique combination of parameters for a trading strategy.
+    The parameters include various metrics such as window size, delta
+    spreads, entry and exit ratios, and other relevant settings that
+    influence the behavior of the strategy. Each combination is designed to
+    explore different scenarios in trading to optimize performance based on
+    historical data.
+
+    Returns:
+        list: A list of dictionaries, each containing configuration parameters
+        for a trading strategy.
+    """
+
     return [
         dict(window_size={"value": 3093}, exit_delta_spread={"value": 1.9973}, entry_delta_spread={"value": 3.6078},
              ratio_entry_band_mov={"value": -1.0981}, minimum_value={"value": 1.1595},
@@ -198,6 +271,18 @@ def combinations():
 
 
 def combinations2():
+    """Generate a list of configuration dictionaries for trading parameters.
+
+    This function returns a list containing a single dictionary that holds
+    various trading parameters such as window size, delta spreads, current
+    and high R values, and other relevant metrics. These parameters can be
+    used in trading algorithms or simulations to configure the behavior of
+    the trading strategy.
+
+    Returns:
+        list: A list containing a dictionary with trading configuration parameters.
+    """
+
     return [
         dict(window_size={"value": 2840}, exit_delta_spread={"value": 0.6353}, entry_delta_spread={"value": 1.46538},
              current_r={"value": 0.88807}, high_r={"value": 2.01372}, ratio_entry_band_mov_ind={"value": 6.8615},
@@ -209,6 +294,32 @@ def combinations2():
 
 
 def xbtusd_combinations_own():
+    """Generate a list of XBT/USD combinations with specific parameters.
+
+    This function creates a list of dictionaries, each representing a unique
+    combination of parameters related to XBT/USD trading. Each dictionary
+    contains values for window sizes, exit and entry delta spreads, and
+    funding options. The combinations are designed for a specific funding
+    system scenario, which is consistent across all entries.
+
+    Returns:
+        list: A list of dictionaries, where each dictionary contains the
+        following keys:
+            - window_size (dict): A dictionary with a 'value' key indicating
+            the size of the window.
+            - exit_delta_spread (dict): A dictionary with a 'value' key
+            indicating the exit delta spread.
+            - entry_delta_spread (dict): A dictionary with a 'value' key
+            indicating the entry delta spread.
+            - window_size2 (dict): A second window size dictionary.
+            - exit_delta_spread2 (dict): A second exit delta spread dictionary.
+            - entry_delta_spread2 (dict): A second entry delta spread dictionary.
+            - band_funding_system (dict): A dictionary indicating the funding
+            system used.
+            - band_funding_system2 (dict): A second funding system dictionary.
+            - funding_options (dict): A dictionary indicating the funding option.
+    """
+
     return [
         dict(window_size={"value": 2988}, exit_delta_spread={"value": 1.5194}, entry_delta_spread={"value": 1.8445},
              window_size2={"value": 2988}, exit_delta_spread2={"value": 1.5194}, entry_delta_spread2={"value": 1.8445},
@@ -394,6 +505,19 @@ def xbtusd_combinations_own():
 
 
 def xbtusd_combinations_nickel():
+    """Generate a list of trading combinations for XBT/USD.
+
+    This function creates a list of dictionaries, each representing a unique
+    combination of trading parameters for XBT/USD. Each dictionary contains
+    various parameters such as window sizes, delta spreads, funding options,
+    and maximum position and trade volume limits. The generated combinations
+    can be used for trading strategy simulations or analysis.
+
+    Returns:
+        list: A list of dictionaries, each containing trading parameters for
+        XBT/USD combinations.
+    """
+
     return [
         dict(window_size={"value": 2969}, exit_delta_spread={"value": 1.5617}, entry_delta_spread={"value": 1.8762},
              window_size2={"value": 2969}, exit_delta_spread2={"value": 1.5617}, entry_delta_spread2={"value": 1.8762},
@@ -519,12 +643,47 @@ def xbtusd_combinations_nickel():
 
 
 def xbtusd_production_params(file_name: str = None, band_funding_system: str = None, band_funding_system2: str = None):
+    """Retrieve and process production parameters for XBTUSD.
+
+    This function reads a CSV file containing production parameters for
+    XBTUSD, maps the real parameters to simulation parameters, and then
+    returns the processed parameters. The function takes optional arguments
+    to specify different band funding systems that can be used in the
+    processing.
+
+    Args:
+        file_name (str): The name of the CSV file containing production parameters.
+        band_funding_system (str?): The first band funding system to use.
+        band_funding_system2 (str?): The second band funding system to use.
+
+    Returns:
+        DataFrame: A DataFrame containing the processed parameters for XBTUSD.
+    """
+
     df = pd.read_csv(f"/home/equinoxai/production_parameters/XBTUSD/{file_name}")
     df = mapping_real_params_to_simulation_params(df)
     return params_for_xbtusd(df, band_funding_system=band_funding_system, band_funding_system2=band_funding_system2)
 
 
 def btc_production_params(file_name: str = None, band_funding_system: str = None, band_funding_system2: str = None):
+    """Retrieve Bitcoin production parameters from a CSV file.
+
+    This function reads a CSV file containing production parameters for
+    Bitcoin, maps the real parameters to simulation parameters, and then
+    retrieves the relevant parameters for the Deribit maker based on the
+    specified funding systems. It is designed to facilitate the analysis and
+    simulation of Bitcoin production scenarios by providing a structured
+    output of the necessary parameters.
+
+    Args:
+        file_name (str?): The name of the CSV file containing production parameters.
+        band_funding_system (str?): The first band funding system to be used.
+        band_funding_system2 (str?): The second band funding system to be used.
+
+    Returns:
+        DataFrame: A DataFrame containing the mapped production parameters for Bitcoin.
+    """
+
     df = pd.read_csv(f"/home/equinoxai/production_parameters/XBTUSD/{file_name}")
     df = mapping_real_params_to_simulation_params(df)
     return params_for_btc_deribit_maker(df, band_funding_system=band_funding_system,
@@ -532,22 +691,84 @@ def btc_production_params(file_name: str = None, band_funding_system: str = None
 
 
 def ethusd_production_params(file_name: str = None, band_funding_system: str = None):
+    """Retrieve and process production parameters for ETH/USD.
+
+    This function reads a CSV file containing production parameters for
+    ETH/USD, maps the real parameters to simulation parameters, and then
+    retrieves the relevant parameters based on the specified funding system.
+    The function is designed to facilitate the analysis of ETH/USD
+    production data by providing a structured output.
+
+    Args:
+        file_name (str?): The name of the CSV file containing production parameters.
+        band_funding_system (str?): The funding system to be used for parameter retrieval.
+
+    Returns:
+        The processed parameters for ETH/USD based on the input data and funding
+            system.
+    """
+
     df = pd.read_csv(f"/home/equinoxai/production_parameters/ETHUSD/{file_name}")
     df = mapping_real_params_to_simulation_params(df)
     return params_for_ethusd_short_go_long(df, band_funding_system=band_funding_system)
 
 
 def ethusd_confirmation_combined(file_name):
+    """Process ETH/USD confirmation data from a CSV file.
+
+    This function reads a CSV file containing ETH/USD simulation parameters
+    and processes the data using the `params_ethusd_combined_results`
+    function. It expects the file to be located in a specific directory
+    structure and returns the results of the processing.
+
+    Args:
+        file_name (str): The name of the CSV file to be read.
+
+    Returns:
+        The result of processing the DataFrame with
+            `params_ethusd_combined_results`.
+    """
+
     df = pd.read_csv(f"/home/equinoxai/simulation_params/ETHUSD/{file_name}")
     return params_ethusd_combined_results(df)
 
 
 def xbtusd_confirmation_combined(file_name):
+    """Process XBTUSD confirmation data from a CSV file.
+
+    This function reads a CSV file containing XBTUSD simulation parameters
+    and processes the data using the `params_xbtusd_combined_results`
+    function. The file path is constructed using a predefined directory
+    structure. It is expected that the CSV file contains relevant data for
+    further analysis.
+
+    Args:
+        file_name (str): The name of the CSV file to be processed.
+
+    Returns:
+        The result of the `params_xbtusd_combined_results` function, which is
+        expected to handle the DataFrame created from the CSV file.
+    """
+
     df = pd.read_csv(f"/home/equinoxai/simulation_params/XBTUSD/{file_name}")
     return params_xbtusd_combined_results(df)
 
 
 def btc_confirmation_combined(file_name):
+    """Process Bitcoin confirmation data from a CSV file.
+
+    This function reads a CSV file containing Bitcoin confirmation data and
+    processes it using the `params_btc_deribit_maker_combined_results`
+    function. The file is expected to be located in the specified directory.
+    The function returns the results of the processing.
+
+    Args:
+        file_name (str): The name of the CSV file containing Bitcoin confirmation data.
+
+    Returns:
+        The result of processing the data from the CSV file.
+    """
+
     df = pd.read_csv(f"/home/equinoxai/simulation_params/XBTUSD/{file_name}")
     return params_btc_deribit_maker_combined_results(df)
 
