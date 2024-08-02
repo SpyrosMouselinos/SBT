@@ -234,6 +234,23 @@ else:
 
 
 def extended_filter(df, condition):
+    """Filter a DataFrame based on specified conditions.
+
+    This function evaluates the 'Estimated PNL' and 'Funding in Total'
+    columns of the provided DataFrame. If the condition is True, it checks
+    if either 'Estimated PNL' or 'Funding in Total' is less than zero. If
+    the condition is False, it only checks if 'Estimated PNL' is less than
+    zero. The function returns a boolean result based on these evaluations.
+
+    Args:
+        df (pandas.DataFrame): The DataFrame containing the financial data
+            with 'Estimated PNL' and 'Funding in Total' columns.
+        condition (bool): A boolean value that determines which condition to apply.
+
+    Returns:
+        bool: True if the specified conditions are met; otherwise, False.
+    """
+
     if condition:
         return df['Estimated PNL'] < 0 or df['Funding in Total'] < 0
     else:

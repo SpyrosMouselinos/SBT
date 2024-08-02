@@ -20,6 +20,25 @@ class AutomateParameterSelection:
         self.project_name = project_name
 
     def download_sweep_results(self, sweep_id: str = 'jd1a03uf'):
+        """Download and compile results from a specified sweep in Weights & Biases.
+
+        This function connects to the Weights & Biases API to retrieve the
+        results of a sweep identified by the provided sweep ID. It logs in using
+        the specified credentials and fetches the runs associated with the
+        sweep. The results are compiled into a DataFrame that includes
+        configuration parameters and summary metrics for each run. If no runs
+        are found with the initial sorting criteria, it attempts to fetch the
+        runs again using an alternative sorting method. The final DataFrame is
+        returned after removing any duplicate columns.
+
+        Args:
+            sweep_id (str): The ID of the sweep to download results from. Defaults to 'jd1a03uf'.
+
+        Returns:
+            pandas.DataFrame: A DataFrame containing the compiled results of the sweep, including
+            configuration parameters and summary metrics.
+        """
+
         t = TicToc()
         t.tic()
         wandb.login(host=os.getenv("WANDB_HOST"), key="local-c079a1f81a639c9546d4e0a7790074d341572ef7")
@@ -64,6 +83,21 @@ class AutomateParameterSelection:
         return df.replace("NaN", np.nan)
 
     def add_date_column_df(self, df):
+        """Add a formatted date column to a DataFrame.
+
+        This function takes a DataFrame and adds a new column named 'Date'. The
+        'Date' column is constructed by formatting the start and end dates from
+        the existing 'date_start' and 'date_end' columns. The format used is
+        'MM-YYYY to MM-YYYY'.
+
+        Args:
+            df (pandas.DataFrame): The input DataFrame containing 'date_start'
+
+        Returns:
+            pandas.DataFrame: The original DataFrame with an additional 'Date'
+            column.
+        """
+
         df['Date'] = df.loc[0, 'date_start'].split("-")[1] + '-' + df.loc[0, 'date_start'].split("-")[0] + ' to ' \
                      + df.loc[0, 'date_end'].split("-")[1] + '-' + df.loc[0, 'date_end'].split("-")[0]
         return df
@@ -72,6 +106,27 @@ class AutomateParameterSelection:
                                                      "max_drawup_d": [1.7, "s"],
                                                      "Std_daily_ROR": [0.01, "s"], "ROR Annualized": [30, "g"],
                                                      "Sharpe Ratio": [4, "g"]}):
+        """Filter a DataFrame based on specified global criteria.
+
+        This method applies a series of filters to the provided DataFrame based
+        on the conditions defined in the `global_filter` dictionary. Each key in
+        the dictionary corresponds to a column in the DataFrame, and the
+        associated value is a list where the first element is the threshold for
+        filtering and the second element indicates whether to filter for values
+        less than or equal to (denoted by "s") or greater than or equal to
+        (denoted by "g") the threshold. The method returns a filtered DataFrame
+        containing only the rows that meet all specified criteria.
+
+        Args:
+            df (pd.DataFrame): The DataFrame to be filtered.
+            global_filter (dict?): A dictionary of filtering criteria where keys are column names
+                and values are lists containing a threshold and a condition.
+                Defaults to a predefined set of filters.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing only the rows that satisfy all filter conditions.
+        """
+
         variables = list(global_filter.keys())
         temp = pd.Series(True, index=df.index)
         for k, v in global_filter.items():
@@ -82,6 +137,25 @@ class AutomateParameterSelection:
         return df[temp]
 
     def combine_results_to_single_df(self, sweep_id_confirm: list = [], sweep_id_training: str = None):
+        """Combine multiple sweep results into a single DataFrame.
+
+        This method retrieves sweep results based on the provided sweep IDs. It
+        first checks for an existing CSV file containing results; if it exists,
+        it loads the data from that file. If the file does not exist, it
+        downloads the results for the training sweep ID and saves them to the
+        CSV file. The method then adds a date column to the initial DataFrame
+        and iterates through the list of confirmed sweep IDs, downloading and
+        appending each corresponding result to the DataFrame. Finally, it
+        returns a single DataFrame containing all combined results.
+
+        Args:
+            sweep_id_confirm (list): A list of confirmed sweep IDs to retrieve results for.
+            sweep_id_training (str): The training sweep ID to download initial results.
+
+        Returns:
+            pandas.DataFrame: A DataFrame containing combined results from all specified sweeps.
+        """
+
         existing_file_name = '/home/kpap/Downloads/results_temp_ethusd_1.csv'
         if os.path.exists(existing_file_name):
             df_init = pd.read_csv(existing_file_name)
@@ -107,23 +181,68 @@ class AutomateParameterSelection:
         return None
 
     def xbtusd_params_list(self):
+        """Retrieve a list of parameters for the XBT/USD trading strategy.
+
+        This function returns a predefined list of parameter names that are used
+        in the XBT/USD trading strategy. These parameters are essential for
+        configuring various aspects of the trading algorithm, including window
+        sizes and delta spreads.
+
+        Returns:
+            list: A list of parameter names relevant to the XBT/USD trading strategy.
+        """
+
         return ['window_size', 'exit_delta_spread', 'entry_delta_spread',
                 'band_funding_system', 'window_size2', 'exit_delta_spread2', 'entry_delta_spread2',
                 'band_funding_system2', 'funding_window', 'funding_options']
 
     def ethusd_params_list(self):
+        """Retrieve a list of parameters related to ETH/USD trading.
+
+        This function returns a predefined list of parameter names that are
+        relevant for configuring trading strategies or algorithms involving the
+        ETH/USD trading pair. The parameters include various settings such as
+        window sizes, delta spreads, and thresholds that can be adjusted for
+        optimal trading performance.
+
+        Returns:
+            list: A list of strings representing the parameter names.
+        """
+
         return ['window_size', 'exit_delta_spread', 'entry_delta_spread',
                 'current_r', 'high_r', 'quanto_threshold',
                 'hours_to_stop', 'ratio_entry_band_mov_ind',
                 'rolling_time_window_size', 'band_funding_system', "funding_window", 'max_trade_volume']
 
     def generic_funding_swap_params_list(self):
+        """Retrieve a list of generic funding swap parameters.
+
+        This function returns a predefined list of parameter names related to
+        funding swaps. These parameters are used in various financial
+        calculations and configurations, providing essential information for
+        managing funding swaps effectively.
+
+        Returns:
+            list: A list of strings representing the names of generic funding swap
+            parameters.
+        """
+
         return ['fastWeightSwap0', 'fastWeightSwap1', 'fastWeightSwap2',
                 'slowWeightSwap0', 'slowWeightSwap1', 'slowWeightSwap2',
                 'hoursBeforeSwap0', 'hoursBeforeSwap1', 'hoursBeforeSwap2',
                 'slow_funding_window', 'funding_periods_lookback']
 
     def generic_funding_spot_params_list(self):
+        """Retrieve a list of generic funding spot parameters.
+
+        This function returns a predefined list of parameter names that are used
+        for generic funding spots. These parameters are likely used in financial
+        calculations or configurations related to funding spots.
+
+        Returns:
+            list: A list of strings representing the generic funding spot parameters.
+        """
+
         return ['fastWeightSpot0', 'fastWeightSpot1', 'fastWeightSpot2',
                 'slowWeightSpot0', 'slowWeightSpot1', 'slowWeightSpot2',
                 'hoursBeforeSpot0', 'hoursBeforeSpot1', 'hoursBeforeSpot2',
@@ -135,6 +254,24 @@ class AutomateParameterSelectionEthusd(AutomateParameterSelection):
         super().__init__(project_name)
 
     def combined_results_df(self, df):
+        """Combine and transform results from a DataFrame.
+
+        This function processes the input DataFrame `df` to create a new
+        DataFrame that consolidates various financial metrics based on specific
+        parameters. It checks for the presence of certain columns in the input
+        DataFrame and adjusts the parameters accordingly. The function
+        identifies duplicate rows based on the specified parameters and
+        organizes the data into a new format that is easier to analyze. The
+        resulting DataFrame includes metrics such as estimated profit and loss,
+        Sharpe ratio, and other relevant financial indicators.
+
+        Args:
+            df (pd.DataFrame): The input DataFrame containing financial data.
+
+        Returns:
+            pd.DataFrame: A new DataFrame with combined and organized results.
+        """
+
         param_list = self.ethusd_params_list()
 
         if "num_of_points_to_lookback_entry" in df.columns :
@@ -268,6 +405,26 @@ class AutomateParameterSelectionXbtusd(AutomateParameterSelection):
         super().__init__(project_name)
 
     def combined_results_df(self, df):
+        """Combine and process results from a DataFrame.
+
+        This method takes a DataFrame containing various financial metrics and
+        processes it to create a new DataFrame that consolidates results based
+        on specific parameters. It checks for the presence of certain columns in
+        the input DataFrame and adjusts the parameters accordingly. The function
+        identifies duplicate rows based on the specified parameters and
+        organizes the data into a final DataFrame with relevant metrics for each
+        unique date.
+
+        Args:
+            df (pd.DataFrame): A DataFrame containing financial data with columns such as 'Date',
+                'Estimated PNL with Funding',
+                'Funding in Total', 'Sharpe Ratio', and other relevant metrics.
+
+        Returns:
+            pd.DataFrame: A new DataFrame containing combined results, with columns for each
+                unique date and relevant metrics.
+        """
+
         param_list = self.xbtusd_params_list()
 
         additional_swap_params = self.generic_funding_swap_params_list()
@@ -406,6 +563,20 @@ class AutomateParameterSelectionXbtusd(AutomateParameterSelection):
         return df_final.dropna(how='all')
 
 def is_int(k):
+    """Check if a value can be converted to an integer.
+
+    This function attempts to convert the given value to an integer. If the
+    conversion is successful, it returns True. If the conversion fails due
+    to a ValueError or TypeError, it catches the exception and returns
+    False.
+
+    Args:
+        k: The value to be checked for integer conversion.
+
+    Returns:
+        bool: True if the value can be converted to an integer, False otherwise.
+    """
+
     try:
         int(k)
         return True
@@ -419,6 +590,21 @@ class AutomateParameterSelectionEthusdMultiperiod(AutomateParameterSelection):
         self.project_name = project_name
 
     def combine_results_to_single_df(self, sweep_id_confirm: list = []):
+        """Combine multiple sweep results into a single DataFrame.
+
+        This method takes a list of sweep IDs, downloads the corresponding sweep
+        results for each ID, adds a date column to each DataFrame, and
+        concatenates them into a single DataFrame. The resulting DataFrame is
+        reset to have a clean index.
+
+        Args:
+            sweep_id_confirm (list): A list of sweep IDs to download results for.
+
+        Returns:
+            pandas.DataFrame: A single DataFrame containing the combined results
+            from all specified sweep IDs.
+        """
+
         df_1 = pd.DataFrame()
         for id in sweep_id_confirm:
             df = self.download_sweep_results(sweep_id=id)
@@ -429,6 +615,25 @@ class AutomateParameterSelectionEthusdMultiperiod(AutomateParameterSelection):
         return df_1.reset_index(drop=True)
 
     def combined_results_df(self, df):
+        """Combine and process results from a DataFrame.
+
+        This function takes a DataFrame containing financial data and processes
+        it to create a new DataFrame that summarizes various metrics such as
+        Estimated PNL, Sharpe Ratio, and others. It handles duplicate entries
+        based on specified parameters and organizes the results into a
+        structured format. The function also dynamically adjusts the columns
+        based on the presence of specific parameters in the input DataFrame.
+
+        Args:
+            df (pd.DataFrame): A DataFrame containing financial data with columns such as 'Date',
+                'Estimated PNL with Quanto_profit', 'Sharpe Ratio', and others.
+
+        Returns:
+            pd.DataFrame: A new DataFrame containing combined results with metrics organized by
+                date
+                and additional parameters if present.
+        """
+
         param_list = self.ethusd_params_list()
 
         if "num_of_points_to_lookback_entry" in df.columns:
@@ -560,6 +765,26 @@ class AutomateParameterSelectionEthusdMultiperiod(AutomateParameterSelection):
         return df_final.dropna(how='all')
 
     def combined_results_df_multi(self, df_multi, df_conf):
+        """Combine multiple DataFrames based on specific parameters.
+
+        This function takes two DataFrames, `df_multi` and `df_conf`, and
+        combines them based on matching parameter values. It renames certain
+        columns in `df_conf` for clarity and filters the columns from both
+        DataFrames to include only those relevant for the analysis. The function
+        then iterates through the rows of `df_conf`, finding corresponding rows
+        in `df_multi` based on a specified tolerance for parameter differences.
+        The results are compiled into a new DataFrame that includes the relevant
+        columns from both input DataFrames.
+
+        Args:
+            df_multi (pd.DataFrame): The first DataFrame containing multiple results.
+            df_conf (pd.DataFrame): The second DataFrame containing configuration results.
+
+        Returns:
+            pd.DataFrame: A new DataFrame containing combined results from both input DataFrames,
+                filtered to remove rows where all values are NaN.
+        """
+
         # df_conf = self.filter_data(df_conf, global_filter=None)
         params_col = self.ethusd_params_list()
         results = []
