@@ -9,6 +9,16 @@ def convert_simulation_csv_to_production_csv(simulation_csv_path: str = None,
                                              local_path: str = None,
                                              num_of_params: int = None,
                                              has_generic_funding_parameters: bool = False):
+    """
+    @brief Converts a csv file to a csv file that can be used for testing.
+    @param simulation_csv_path Path to the simulation csv file.
+    @param production_csv_path Path to the production csv file.
+    @param strategies_list List of strings that are the names of the strategies to be used in the simulation csv.
+    @param local_path Path to the local folder where the data is stored.
+    @param num_of_params Number of fundamental parameters that should be placed at the beginning of the simulation csv.
+    @param has_generic_funding_parameters True if there are generic funding parameters.
+    @return A dataframe with the following columns : 1. index of the strategies 2
+    """
     df = pd.read_csv(simulation_csv_path)
     # create a dictionary to place generic funding parameters
     index_len = len(strategies_list)
@@ -16,6 +26,7 @@ def convert_simulation_csv_to_production_csv(simulation_csv_path: str = None,
     renamed_columns, original_columns = production_csv_column_list(production_csv_path)
     prod_df = pd.DataFrame(columns=renamed_columns)
 
+    # The strategy group for the strategy group.
     if "bitmex_perp_deribit_perp_btc" in strategies_list[0]:
         strategy_group = "xbtusd_deribit"
     elif "XBTUSD_maker_perpetual" in strategies_list[0]:
@@ -27,6 +38,7 @@ def convert_simulation_csv_to_production_csv(simulation_csv_path: str = None,
     else:
         return
 
+    # If the strategy group has generic funding parameters and has generic funding parameters set to the same value as the strategy group.
     if 'deribit' in strategy_group and has_generic_funding_parameters:
         swap_funding_weights, spot_funding_weights = create_generic_funding_parameters(df, num_of_params, "deribit")
     elif 'bitmex' in strategy_group and has_generic_funding_parameters:
@@ -122,6 +134,13 @@ def convert_simulation_csv_to_production_csv(simulation_csv_path: str = None,
 
 
 def create_generic_funding_parameters(df: pd.DataFrame, num_of_params: int = 3, swap_exchange: str = "deribit"):
+    """
+     @brief Create a DataFrame that can be used to fill in the FundingParameters.
+     @param df DataFrame to be filled in. The DataFrame has to be in the format described in create_funding_parameters
+     @param num_of_params Number of
+     @param swap_exchange
+    """
+    # Returns the swap exchange suffix.
     if swap_exchange == "deribit":
         suffix1 = "Swap"
         suffix2 = "Spot"
@@ -174,6 +193,11 @@ def create_generic_funding_parameters(df: pd.DataFrame, num_of_params: int = 3, 
 
 
 def production_csv_column_list(production_csv_path: str = None):
+    """
+     @brief Read and renames columns to make them easier to read. This is a helper function for : func : ` production_csv_to_csv `
+     @param production_csv_path Path to production csv file.
+     @return Tuple of renamed columns and original columns. The first element of the tuple is a list of renamed columns
+    """
     df = pd.read_csv(production_csv_path, on_bad_lines='skip')
     renamed_columns = df.columns.tolist()
     duplicate_columns = df.loc[:, df.columns.str.contains(".1")].columns.tolist()

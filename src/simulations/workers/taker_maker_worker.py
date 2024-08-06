@@ -17,6 +17,10 @@ functions = {'simulation_trader': simulation_trader
 class TakerMakerWorker:
 
     def __init__(self, queue="simulation_rpc_queue"):
+        """
+         @brief Initialize the connection to RabbitMQ. This is called by __init__ and should not be called directly
+         @param queue The name of the
+        """
         self.credentials = pika.PlainCredentials(os.getenv("RABBITMQ_USERNAME"), os.getenv("RABBITMQ_PASSWORD"))
         self.connection = pika.BlockingConnection(
             pika.ConnectionParameters(host=os.getenv("RABBITMQ_HOSTNAME"), credentials=self.credentials, heartbeat=5))

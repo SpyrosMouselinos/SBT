@@ -10,6 +10,11 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 
 def download_simulation_results_from_backbalaze(file_id_download: str = None, date_range: list = None):
+    """
+     @brief Download simulation results from backbalaze. This will be used to download the simulation results from equinoxai
+     @param file_id_download File ID to download.
+     @param date_range List of dates to download simulation results
+    """
     backblaze = BackblazeClient()
     backblaze.authorize()
     b2 = backblaze.get_b2_resource()
@@ -18,6 +23,7 @@ def download_simulation_results_from_backbalaze(file_id_download: str = None, da
                                                      time_from=datetime.datetime.strptime(f"{date_range[0]}",
                                                                                           '%Y-%m-%d'),
                                                      time_to=datetime.datetime.strptime(f"{date_range[1]}", '%Y-%m-%d'))
+    # This function will take a file_dataframe and return a dataframe with the selected time and time as a dataframe.
     if len(file_dataframe) == 0:
         print('The run with the selected ID was not found in the selected period!')
     else:

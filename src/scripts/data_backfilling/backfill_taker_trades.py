@@ -14,7 +14,19 @@ from src.common.connections.DatabaseConnections import InfluxConnection
 
 
 class BackfillTrades:
+    """
+    Base class for backfilling trade data to an InfluxDB database.
+
+    Provides methods for writing trade data to the database and utility functions
+    for timestamp conversion and data processing.
+    """
+
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTrades class.
+
+        Sets up the InfluxDB client and authentication for backfilling data.
+        """
         self.exchange = None
         self.client = InfluxDBClient(host='simulations-influxdb',
                                      port=8086,
@@ -27,10 +39,29 @@ class BackfillTrades:
 
     @staticmethod
     def daterange(start_date, end_date):
+        """
+        Generates a range of dates between start_date and end_date.
+
+        @param start_date: The start date for the range.
+        @param end_date: The end date for the range.
+
+        @return: A generator yielding dates from start_date to end_date.
+        """
         for n in range(int((end_date - start_date).days)):
             yield start_date + timedelta(n)
 
     def points_to_json(self, time, side, price, size, symbol):
+        """
+        Converts trade data into a JSON format suitable for InfluxDB.
+
+        @param time: The timestamp of the trade in milliseconds.
+        @param side: The trade side, either 'Bid' or 'Ask'.
+        @param price: The price of the trade.
+        @param size: The size of the trade.
+        @param symbol: The symbol of the traded asset.
+
+        @return: A dictionary representing the trade in JSON format.
+        """
         return {
             "measurement": "trade",
             "tags": {
@@ -47,10 +78,24 @@ class BackfillTrades:
 
     @staticmethod
     def milliseconds_to_nanoseconds(timestamp_in_milliseconds):
+        """
+        Converts a timestamp from milliseconds to nanoseconds.
+
+        @param timestamp_in_milliseconds: The timestamp in milliseconds.
+
+        @return: The timestamp converted to nanoseconds.
+        """
         return timestamp_in_milliseconds * 1000000
 
     @staticmethod
     def check_for_identical_timestamps(timestamps):
+        """
+        Adjusts identical timestamps to ensure uniqueness by incrementing them by 1.
+
+        @param timestamps: A list of timestamps to check for duplicates.
+
+        @return: A list of timestamps with duplicates adjusted.
+        """
         for index in range(len(timestamps) - 2):
             to_add = 1
             next_element = index + 1
@@ -66,15 +111,43 @@ class BackfillTrades:
 
     @staticmethod
     def milliseconds_to_microseconds(timestamp_in_milliseconds):
+        """
+        Converts a timestamp from milliseconds to microseconds.
+
+        @param timestamp_in_milliseconds: The timestamp in milliseconds.
+
+        @return: The timestamp converted to microseconds.
+        """
         return timestamp_in_milliseconds * 1000
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for a given symbol and date range to the database.
+
+        This is a placeholder method intended to be implemented by subclasses.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         return
 
 
 class BackfillPricesLMAX(BackfillTrades):
+    """
+    A class for backfilling price data from LMAX exchange.
+
+    Inherits from BackfillTrades and provides specific implementation for LMAX exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillPricesLMAX class.
+
+        Sets up the InfluxDB client for LMAX and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "LMAX"
         self.client = InfluxDBClient('influxdb.staging.equinoxai.com',
@@ -85,7 +158,17 @@ class BackfillPricesLMAX(BackfillTrades):
         self.client._headers["Cookie"] = os.getenv("AUTHELIA_COOKIE_STAGING")
 
     def write_trades(self, symbol, start_date=None, end_date=None):
+        """
+        Writes price data for the specified symbol to the InfluxDB database.
 
+        Reads data from CSV files, processes it, and writes it to the database.
+
+        @param symbol: The symbol of the asset to write prices for.
+        @param start_date: The start date for the price data backfill (optional).
+        @param end_date: The end date for the price data backfill (optional).
+
+        @return: None
+        """
         path = "/home/kt/Downloads/BTCUSD & ETHUSD"
         for path, subdirs, files in os.walk(path):
             for name in files:
@@ -134,9 +217,20 @@ class BackfillPricesLMAX(BackfillTrades):
                     if len(points_to_write) > 0:
                         self.client.write_points(points_to_write, time_precision='ms')
 
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
     def price_points_to_json(self, time, side, price, size, symbol):
+        """
+        Converts price data into a JSON format suitable for InfluxDB.
+
+        @param time: The timestamp of the price data in milliseconds.
+        @param side: The side of the price, either 'Bid' or 'Ask'.
+        @param price: The price of the asset.
+        @param size: The size of the trade or order.
+        @param symbol: The symbol of the traded asset.
+
+        @return: A dictionary representing the price data in JSON format.
+        """
         return {
             "measurement": "price",
             "tags": {
@@ -152,13 +246,35 @@ class BackfillPricesLMAX(BackfillTrades):
 
 
 class BackfillTradesBinance(BackfillTrades):
+    """
+    A class for backfilling trade data from Binance exchange.
+
+    Inherits from BackfillTrades and provides specific implementation for Binance exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesBinance class.
+
+        Sets up the InfluxDB client for Binance and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "Binance"
         self.client = InfluxConnection.getInstance().archival_client_spotswap
 
     def write_trades(self, symbol, start_date, end_date, market=None):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from Binance and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+        @param market: The market type ('fapi' for futures, 'dapi' for coin-margined futures).
+
+        @return: None
+        """
         current_date = start_date
         start = current_date.strftime('%Y-%m-%d')
         end = end_date.strftime('%Y-%m-%d')
@@ -224,9 +340,19 @@ class BackfillTradesBinance(BackfillTrades):
             start = current_date.strftime('%Y-%m-%d')
             zf.close()
             os.remove(filename)
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
     def write_all(self, start_date, end_date):
+        """
+        Writes trade data for all eligible symbols on Binance to the InfluxDB database.
+
+        Determines eligible symbols based on trading volume and writes their data.
+
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         dapi_tickers = json.loads(requests.get("https://dapi.binance.com/dapi/v1/ticker/24hr").text)
         print(f"Total Symbols: {len(dapi_tickers)}")
         for ticker in dapi_tickers:
@@ -243,14 +369,35 @@ class BackfillTradesBinance(BackfillTrades):
 
 
 class BackfillTradesBinanceCoin(BackfillTrades):
+    """
+    A class for backfilling trade data from Binance Coin-M futures exchange.
+
+    Inherits from BackfillTrades and provides specific implementation for Binance Coin-M futures exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesBinanceCoin class.
+
+        Sets up the InfluxDB client for Binance Coin-M futures and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "Binance"
         self.headers = {"X-MBX-APIKEY": os.getenv("BINANCE_KEY")}
         self.client = InfluxConnection.getInstance().archival_client_spotswap
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from Binance Coin-M futures and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         start = int(start_date.timestamp() * 1000)
         end = int(end_date.timestamp() * 1000)
         from_id = None
@@ -299,18 +446,39 @@ class BackfillTradesBinanceCoin(BackfillTrades):
                 f" to {datetime.fromtimestamp(trades_df['time'].max() / (1000 * 1000 * 1000))}, "
                 f"ends in {datetime.fromtimestamp(start / 1000)}")
 
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
 
 class BackfillTradesBinanceUSDT(BackfillTrades):
+    """
+    A class for backfilling trade data from Binance USDT-M futures exchange.
+
+    Inherits from BackfillTrades and provides specific implementation for Binance USDT-M futures exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesBinanceUSDT class.
+
+        Sets up the InfluxDB client for Binance USDT-M futures and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "Binance"
         self.headers = {"X-MBX-APIKEY": os.getenv("BINANCE_KEY")}
         self.client = InfluxConnection.getInstance().archival_client_spotswap
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from Binance USDT-M futures and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         start = int(start_date.timestamp() * 1000)
         initial_end = int(end_date.timestamp() * 1000)
         end = int(end_date.timestamp() * 1000)
@@ -371,16 +539,37 @@ class BackfillTradesBinanceUSDT(BackfillTrades):
                 f" to {datetime.fromtimestamp(trades_df['time'].max() / (1000 * 1000 * 1000))}, "
                 f"ends in {datetime.fromtimestamp(start / 1000)}")
 
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
 
 class BackfillTradesBitfinex(BackfillTrades):
+    """
+    A class for backfilling trade data from Bitfinex exchange.
+
+    Inherits from BackfillTrades and provides specific implementation for Bitfinex exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesBitfinex class.
+
+        Sets up the InfluxDB client for Bitfinex and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "Bitfinex"
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from Bitfinex and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         start = int(start_date.timestamp() * 1000)
         end = int(end_date.timestamp() * 1000)
         points_to_write = []
@@ -420,16 +609,36 @@ class BackfillTradesBitfinex(BackfillTrades):
             if len(points_to_write) > 0:
                 self.client.write_points(points_to_write, time_precision='n')
                 points_to_write = []
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
-
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
 class BackfillTradesBitflyer(BackfillTrades):
+    """
+    A class for backfilling trade data from the Bitflyer exchange.
+
+    Inherits from BackfillTrades and provides a specific implementation for Bitflyer exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesBitflyer class.
+
+        Sets up the InfluxDB client for Bitflyer and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "Bitflyer"
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from Bitflyer and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         start = int(start_date.timestamp() * 1000)
         end = int(end_date.timestamp() * 1000)
         from_id = None
@@ -461,7 +670,7 @@ class BackfillTradesBitflyer(BackfillTrades):
             trades_df["time"] = pd.to_datetime(trades_df["exec_date"], unit="ns")
             trades_df["time"] = trades_df["time"].astype(np.int64)
             trades_df["time"] = pd.Series(self.check_for_identical_timestamps(trades_df["time"].tolist()),
-                                          dtype=object)  # dtype=object so it wont change the int timestamps to float and affect nanoseconds
+                                          dtype=object)  # dtype=object so it won't change the int timestamps to float and affect nanoseconds
 
             for index, row in trades_df.iterrows():
                 side = "Ask" if row["side"] == "SELL" else "Bid"
@@ -485,18 +694,39 @@ class BackfillTradesBitflyer(BackfillTrades):
                 f" to {datetime.fromtimestamp(trades_df['time'].max() / (1000 * 1000 * 1000))}, "
                 f"ends in {datetime.fromtimestamp(start / 1000)}")
 
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
 
 class BackfillTradesDeribit(BackfillTrades):
+    """
+    A class for backfilling trade data from the Deribit exchange.
+
+    Inherits from BackfillTrades and provides a specific implementation for the Deribit exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesDeribit class.
+
+        Sets up the InfluxDB client for Deribit and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "Deribit"
         self.headers = {}
         self.client = InfluxConnection.getInstance().staging_client_spotswap
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from Deribit and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         start = int(start_date.timestamp() * 1000)
         end = int(end_date.timestamp() * 1000)
         points_to_write = []
@@ -516,12 +746,11 @@ class BackfillTradesDeribit(BackfillTrades):
                 print(f"API Error:{data}")
                 continue
             trades_df = pd.DataFrame(data['result']['trades'])
-            # trades_df["timestamp"] = trades_df["timestamp"].astype("float")
             trades_df["price"] = trades_df["price"].astype("float")
             trades_df["amount"] = abs(trades_df["amount"])
             trades_df["timestamp"] = self.milliseconds_to_nanoseconds(trades_df["timestamp"])
             trades_df["timestamp"] = pd.Series(self.check_for_identical_timestamps(trades_df["timestamp"].tolist()),
-                                               dtype=object)  # dtype=object so it wont change the int timestamps to float and affect nanoseconds
+                                               dtype=object)  # dtype=object so it won't change the int timestamps to float and affect nanoseconds
 
             for index, row in trades_df.iterrows():
                 side = "Ask" if row["direction"] == "sell" else "Bid"
@@ -543,16 +772,37 @@ class BackfillTradesDeribit(BackfillTrades):
                 f" to {datetime.fromtimestamp(trades_df['timestamp'].max() / (1000 * 1000 * 1000))}, "
                 f"ends in {datetime.fromtimestamp(start / 1000)}")
 
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
 
 class BackfillTradesFTX(BackfillTrades):
+    """
+    A class for backfilling trade data from the FTX exchange.
+
+    Inherits from BackfillTrades and provides a specific implementation for FTX exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesFTX class.
+
+        Sets up the InfluxDB client for FTX and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "FTX"
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from FTX and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         start = int(start_date.timestamp())  # API accepts timestamps in seconds only
         end = int(end_date.timestamp())
         points_to_write = []
@@ -572,7 +822,7 @@ class BackfillTradesFTX(BackfillTrades):
             trades_df["dollars"] = abs(trades_df["size"] * trades_df["price"])
             trades_df["time"] = trades_df["time"].astype('datetime64[ns]').astype("int")
             trades_df["time"] = pd.Series(self.check_for_identical_timestamps(trades_df["time"].tolist()),
-                                          dtype=object)  # dtype=object so it wont change the int timestamps to float and affect nanoseconds
+                                          dtype=object)  # dtype=object so it won't change the int timestamps to float and affect nanoseconds
 
             for index, row in trades_df.iterrows():
                 side = "Ask" if row["side"] == "sell" else "Bid"
@@ -595,18 +845,38 @@ class BackfillTradesFTX(BackfillTrades):
                 f"Data successfully Backfilled from {datetime.fromtimestamp(trades_df['time'].min() / (1000 * 1000 * 1000))}"
                 f" to {datetime.fromtimestamp(trades_df['time'].max() / (1000 * 1000 * 1000))}, "
                 f"ends in {datetime.fromtimestamp(start)}")
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
 
 class BackfillTradesHuobi(BackfillTrades):
+    """
+    A class for backfilling trade data from the Huobi exchange.
+
+    Inherits from BackfillTrades and provides a specific implementation for Huobi exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesHuobi class.
+
+        Sets up the InfluxDB client for Huobi and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "HuobiDMSwap"
         self.client = InfluxConnection.getInstance().archival_client_spotswap
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
 
+        Fetches trade data from Huobi and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         current_date = start_date
         start = current_date.strftime('%Y-%m-%d')
         end = end_date.strftime('%Y-%m-%d')
@@ -646,7 +916,7 @@ class BackfillTradesHuobi(BackfillTrades):
             trades_df["time"] = self.milliseconds_to_microseconds(trades_df["time"])
             trades_df["time"] = trades_df["time"].astype(np.int64)
             trades_df["time"] = pd.Series(self.check_for_identical_timestamps(trades_df["time"].tolist()),
-                                          dtype=object)  # dtype=object so it wont change the int timestamps to float and affect nanoseconds
+                                          dtype=object)  # dtype=object so it won't change the int timestamps to float and affect nanoseconds
 
             for index, row in trades_df.iterrows():
                 side = "Ask" if row["side"] == "sell" else "Bid"
@@ -669,9 +939,19 @@ class BackfillTradesHuobi(BackfillTrades):
             zf.close()
             os.remove(filename)
 
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
     def write_all(self, start_date, end_date):
+        """
+        Writes trade data for all symbols with significant volume to the InfluxDB database.
+
+        Fetches trade data from Huobi and writes it to the database for all symbols with volume greater than 20000.
+
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         swap_tickers = json.loads(requests.get("https://api.hbdm.com/v2/swap-ex/market/detail/batch_merged").text)
         print(f"Total Symbols: {len(swap_tickers)}")
         for ticker in swap_tickers['ticks']:
@@ -688,8 +968,18 @@ class BackfillTradesHuobi(BackfillTrades):
 
 
 class BackfillTradesKraken(BackfillTrades):
+    """
+    A class for backfilling trade data from the Kraken exchange.
+
+    Inherits from BackfillTrades and provides a specific implementation for Kraken exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesKraken class.
+
+        Sets up the InfluxDB client for Kraken and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "Kraken"
         self.client = InfluxConnection.getInstance().archival_client_spotswap
@@ -699,6 +989,17 @@ class BackfillTradesKraken(BackfillTrades):
         }
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from Kraken and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         start = int(start_date.timestamp())  # API accepts timestamps in seconds only
         end = int(end_date.timestamp())
         points_to_write = []
@@ -740,12 +1041,22 @@ class BackfillTradesKraken(BackfillTrades):
                 f"Data successfully Backfilled from {datetime.fromtimestamp(trades_df['time'].min() / (1000 * 1000))}"
                 f" to {datetime.fromtimestamp(trades_df['time'].max() / (1000 * 1000))}, "
                 f"ends in {datetime.fromtimestamp(start)}")
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
 
 class BackfillTradesOkex(BackfillTrades):
+    """
+    A class for backfilling trade data from the Okex exchange.
+
+    Inherits from BackfillTrades and provides a specific implementation for Okex exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesOkex class.
+
+        Sets up the InfluxDB client for Okex and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "Okex"
         self.client = InfluxDBClient(host='influxdb.staging.equinoxai.com',
@@ -759,7 +1070,18 @@ class BackfillTradesOkex(BackfillTrades):
         self.client._headers["Cookie"] = os.getenv("AUTHELIA_COOKIE_STAGING")
 
     def write_trades(self, symbol, start_date, end_date, contract_size=None):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
 
+        Fetches trade data from Okex and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+        @param contract_size: A dictionary to calculate the dollar value of trades based on contract size.
+
+        @return: None
+        """
         current_date = start_date
         start = current_date.strftime('%Y-%m-%d')
         end = end_date.strftime('%Y-%m-%d')
@@ -799,7 +1121,7 @@ class BackfillTradesOkex(BackfillTrades):
             trades_df["time"] = trades_df["time"].astype(np.int64)
 
             trades_df["time"] = pd.Series(self.check_for_identical_timestamps(trades_df["time"].tolist()),
-                                          dtype=object)  # dtype=object so it wont change the int timestamps to float and affect nanoseconds
+                                          dtype=object)  # dtype=object so it won't change the int timestamps to float and affect nanoseconds
 
             for index, row in trades_df.iterrows():
                 side = "Ask" if row["side"] == "SELL" else "Bid"
@@ -822,9 +1144,19 @@ class BackfillTradesOkex(BackfillTrades):
             zf.close()
             os.remove(filename)
 
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
     def write_all(self, start_date, end_date):
+        """
+        Writes trade data for all symbols with significant volume to the InfluxDB database.
+
+        Fetches trade data from Okex and writes it to the database for all symbols with volume greater than 50000.
+
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         tickers = json.loads(requests.get("https://www.okex.com/api/v5/market/tickers?instType=SWAP").text)
         print(f"Total Symbols: {len(tickers['data'])}")
         for ticker in tickers['data']:
@@ -833,13 +1165,34 @@ class BackfillTradesOkex(BackfillTrades):
 
 
 class BackfillTradesWOO(BackfillTrades):
+    """
+    A class for backfilling trade data from the WOO exchange.
+
+    Inherits from BackfillTrades and provides a specific implementation for WOO exchange.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the BackfillTradesWOO class.
+
+        Sets up the InfluxDB client for WOO and specifies the exchange name.
+        """
         BackfillTrades.__init__(self)
         self.exchange = "WOO"
         self.client = InfluxConnection.getInstance().archival_client_spotswap
 
     def write_trades(self, symbol, start_date, end_date):
+        """
+        Writes trade data for the specified symbol and date range to the InfluxDB database.
+
+        Fetches trade data from WOO and writes it to the database.
+
+        @param symbol: The symbol of the asset to write trades for.
+        @param start_date: The start date for trade data backfill.
+        @param end_date: The end date for trade data backfill.
+
+        @return: None
+        """
         start = int(start_date.timestamp())  # API accepts timestamps in seconds only
         end = int(end_date.timestamp())
         points_to_write = []
@@ -881,7 +1234,8 @@ class BackfillTradesWOO(BackfillTrades):
                 f"Data successfully Backfilled from {datetime.fromtimestamp(trades_df['time'].min() / (1000 * 1000 * 1000))}"
                 f" to {datetime.fromtimestamp(trades_df['time'].max() / (1000 * 1000 * 1000))}, "
                 f"ends in {datetime.fromtimestamp(start)}")
-        print(f"Backfill for exchange {self.exchange} an symbol {symbol} successfully ended")
+        print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
+
 
 
 def start_backfill(exchanges):

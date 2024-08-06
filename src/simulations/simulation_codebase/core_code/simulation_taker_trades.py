@@ -7,8 +7,17 @@ import numpy as np
 
 
 def get_taker_trades(t0, t1, swapMarket, swapSymbol):
+    """
+     @brief Get trades from Taker. This is a function to get trades from Taker. It takes two parameters t0 and t1 which are datetime objects and swapMarket and swapSymbol
+     @param t0 datetime object of start date
+     @param t1 datetime object of end date ( inclusive )
+     @param swapMarket string of swap market ( BitMEX HuobiDMSwap Okex Deribit )
+     @param swapSymbol string of swap symbol ( BTCUSD etc. )
+     @return pandas. DataFrame with trades from Taker. Each row corresponds to a time stamp and trade type
+    """
     influx_connection = InfluxConnection.getInstance()
     start = time.time()
+    # This function will return a Takers object for the swap market.
     if swapMarket == 'BitMEX' or swapMarket == 'Binance' or swapMarket == 'HuobiDMSwap':
         swap_takers_querier = Takers(influx_connection.archival_client_spotswap_dataframe,
                                      [swapMarket], [swapSymbol])
@@ -26,19 +35,24 @@ def get_taker_trades(t0, t1, swapMarket, swapSymbol):
     try:
         day_in_millis = 1000 * 60 * 60 * 24
         dfs = []
+        # Load trades from influx.
         if t1 - t0 >= day_in_millis:
             t_start = t0
             t_end = t0 + day_in_millis
 
+            # Load trades from influx.
             while t_end <= t1:
+                # Set t_end to the end of the time range.
                 if t1 - day_in_millis <= t_end <= t1:
                     t_end = t1
 
                 base_dir = f"/home/equinoxai/data"
+                # Returns the base directory where simulations_management data is stored.
                 if not os.path.isdir(base_dir):
                     base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../",
                                             "simulations_management", "data")
                 local_dir_swap = f"{base_dir}/trades/{swapMarket}/{swapSymbol}/{swapMarket}_{swapSymbol}_{pd.to_datetime(t_start, unit='ms', utc=True).date()}.parquet.br"
+                # Load taker trades from local file and load them into a DFS.
                 if os.path.exists(local_dir_swap):
                     # print(f"Loading taker trades from local file {local_dir_swap}")
                     try:

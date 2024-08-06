@@ -18,6 +18,18 @@ load_dotenv(find_dotenv())
 
 
 def is_training_running(host, sweep_id):
+    """
+    Checks if a training sweep is currently running on a specified host.
+
+    @param host: The hostname or IP address of the machine where the training sweep might be running.
+    @param sweep_id: The unique identifier of the sweep to check.
+
+    @return: Returns True if a training sweep with the specified ID is running on the host; otherwise, returns False.
+
+    @details:
+        This function establishes an SSH connection to the specified host and executes a command to check for running
+        training sweeps using Docker. If a sweep with the specified ID is found, it indicates that the training is still running.
+    """
     my_sweep_cmd = ''' 'docker ps --format "table {{.Names}}\t{{.Status}}" | grep "sweep_''' + sweep_id + '''" | awk "NR==1{print $1}"' '''
     # Check if there is any sweep running
     cmd = f"ssh {host} {my_sweep_cmd}"
@@ -32,6 +44,18 @@ def is_training_running(host, sweep_id):
 
 
 def is_controller_running(sweep_id, host):
+    """
+    Checks if a controller process is running on a specified host for a given sweep ID.
+
+    @param sweep_id: The unique identifier of the sweep whose controller is being checked.
+    @param host: The hostname or IP address of the machine where the controller might be running.
+
+    @return: Returns True if a controller process with the specified sweep ID is running on the host; otherwise, returns False.
+
+    @details:
+        This function establishes an SSH connection to the specified host and executes a command to check for controller
+        processes related to the given sweep ID. If more than two processes are found, it indicates that the controller is still active.
+    """
     controller_sweep_cmd = f''' 'ps -aux | grep "sweep_{sweep_id}" | wc -l' '''
     # Check if there is any sweep running
     cmd = f"ssh {host} {controller_sweep_cmd}"
@@ -46,12 +70,54 @@ def is_controller_running(sweep_id, host):
 
 
 class DataFetcher:
+    """
+    A class for fetching, processing, and uploading financial data to Backblaze B2 storage.
+
+    @details:
+        This class connects to InfluxDB to query price, trade, funding, and real-time funding data. The data is processed
+        and uploaded to Backblaze B2 storage in Parquet format using Brotli compression.
+
+    Attributes:
+        client (InfluxDBClient): An instance of InfluxDB client for staging data.
+        client_archival (InfluxDBClient): An instance of InfluxDB client for archival data.
+
+    Methods:
+        fetch_and_upload: Fetches and uploads data to Backblaze B2.
+        upload_prices_to_backblaze: Uploads price data to Backblaze B2.
+        upload_trades_to_backblaze: Uploads trade data to Backblaze B2.
+        upload_real_time_funding_to_backblaze: Uploads real-time funding data to Backblaze B2.
+        upload_funding_to_backblaze: Uploads funding data to Backblaze B2.
+        upload_to_backblaze: General method for uploading files to Backblaze B2.
+        download_prices: Downloads price data from Backblaze B2.
+        download_trades: Downloads trade data from Backblaze B2.
+        download_real_time_funding: Downloads real-time funding data from Backblaze B2.
+        download_funding: Downloads funding data from Backblaze B2.
+        download: General method for downloading files from Backblaze B2.
+        download_from_backblaze: Downloads a file from Backblaze B2 to a local directory.
+    """
+
     def __init__(self):
+        """
+        Initializes the DataFetcher class by setting up the InfluxDB clients for staging and archival data.
+        """
         self.client = InfluxConnection.getInstance().staging_client_spotswap
         self.client_archival = InfluxConnection.getInstance().archival_client_spotswap
 
     def fetch_and_upload(self, base_path, exchange, symbol, start, end):
+        """
+        Fetches data from InfluxDB and uploads it to Backblaze B2 storage.
 
+        @param base_path: The base path in Backblaze B2 for storing the data (e.g., 'prices', 'trades').
+        @param exchange: The exchange name (e.g., 'Binance', 'Deribit').
+        @param symbol: The trading symbol (e.g., 'BTC/USD').
+        @param start: The start datetime for fetching data.
+        @param end: The end datetime for fetching data.
+
+        @details:
+            This method queries InfluxDB for price, trade, funding, or real-time funding data, processes the data,
+            and uploads it to Backblaze B2 storage in Parquet format using Brotli compression. The method iterates
+            over each day within the specified date range and uploads the corresponding data.
+        """
         t_start = start
         t_end = start + timedelta(days=1)
         while t_end <= end:
@@ -70,6 +136,8 @@ class DataFetcher:
                     requests.post(f"https://nodered.equinoxai.com/simulation_alerts", data=json.dumps(message),
                                   headers={
                                       "Content-Type": "application/json", "Cookie": os.getenv("AUTHELIA_COOKIE")})
+                    t_start = t_start + timedelta(days=1)
+                    t_end = t_end + timedelta(days=1)
                     continue
                 day = t_start
                 print(day, type(day))
@@ -125,6 +193,8 @@ class DataFetcher:
                     requests.post(f"https://nodered.equinoxai.com/simulation_alerts", data=json.dumps(message),
                                   headers={
                                       "Content-Type": "application/json", "Cookie": os.getenv("AUTHELIA_COOKIE")})
+                    t_start = t_start + timedelta(days=1)
+                    t_end = t_end + timedelta(days=1)
                     continue
                 day = t_start
                 print(day, type(day))
@@ -150,6 +220,8 @@ class DataFetcher:
                     requests.post(f"https://nodered.equinoxai.com/simulation_alerts", data=json.dumps(message),
                                   headers={
                                       "Content-Type": "application/json", "Cookie": os.getenv("AUTHELIA_COOKIE")})
+                    t_start = t_start + timedelta(days=1)
+                    t_end = t_end + timedelta(days=1)
                     continue
                 day = t_start
                 print(day, type(day))
@@ -162,20 +234,78 @@ class DataFetcher:
         return
 
     def upload_prices_to_backblaze(self, filename, exchange, symbol):
+        """
+        Uploads price data to Backblaze B2 storage.
+
+        @param filename: The name of the file to be uploaded.
+        @param exchange: The exchange name associated with the data.
+        @param symbol: The trading symbol associated with the data.
+
+        @return: The result of the upload operation.
+        """
         return self.upload_to_backblaze("prices", filename, exchange, symbol)
 
     def upload_trades_to_backblaze(self, filename, exchange, symbol):
+        """
+        Uploads trade data to Backblaze B2 storage.
+
+        @param filename: The name of the file to be uploaded.
+        @param exchange: The exchange name associated with the data.
+        @param symbol: The trading symbol associated with the data.
+
+        @return: The result of the upload operation.
+        """
         return self.upload_to_backblaze("trades", filename, exchange, symbol)
 
     def upload_real_time_funding_to_backblaze(self, filename, exchange, symbol):
+        """
+        Uploads real-time funding data to Backblaze B2 storage.
+
+        @param filename: The name of the file to be uploaded.
+        @param exchange: The exchange name associated with the data.
+        @param symbol: The trading symbol associated with the data.
+
+        @return: The result of the upload operation.
+
+        @details:
+            This method only uploads real-time funding data for the 'Deribit' exchange.
+        """
         if exchange == 'Deribit':
             return self.upload_to_backblaze("real_time_funding", filename, exchange, symbol)
 
     def upload_funding_to_backblaze(self, filename, exchange, symbol):
+        """
+        Uploads funding data to Backblaze B2 storage.
+
+        @param filename: The name of the file to be uploaded.
+        @param exchange: The exchange name associated with the data.
+        @param symbol: The trading symbol associated with the data.
+
+        @return: The result of the upload operation.
+
+        @details:
+            This method only uploads funding data for exchanges other than 'Deribit'.
+        """
         if exchange != 'Deribit':
             return self.upload_to_backblaze("funding", filename, exchange, symbol)
 
     def upload_to_backblaze(self, base_path, filename, exchange, symbol):
+        """
+        Uploads a file to Backblaze B2 storage.
+
+        @param base_path: The base path in Backblaze B2 for storing the data (e.g., 'prices', 'trades').
+        @param filename: The name of the file to be uploaded.
+        @param exchange: The exchange name associated with the data.
+        @param symbol: The trading symbol associated with the data.
+
+        @return: None
+
+        @details:
+            This method initializes a connection to Backblaze B2, authorizes the account using application key and secret,
+            and uploads the specified file to the appropriate bucket and folder in Backblaze B2. If the file size is below
+            a certain threshold, an alert message is sent, and the upload is aborted. After a successful upload, the local
+            file is removed. If the upload fails, an error message is sent.
+        """
         print(f"Ready to upload parquet file {filename}")
         # backblaze
         b2_api = B2Api()
@@ -209,24 +339,71 @@ class DataFetcher:
         return
 
     def download_prices(self, exchange, symbol, start_ms, end_ms):
+        """
+        Downloads price data from Backblaze B2 storage.
+
+        @param exchange: The exchange name associated with the data.
+        @param symbol: The trading symbol associated with the data.
+        @param start_ms: The start time in milliseconds for downloading data.
+        @param end_ms: The end time in milliseconds for downloading data.
+
+        @return: The result of the download operation.
+        """
         return self.download("prices", exchange, symbol, start_ms, end_ms)
 
     def download_trades(self, exchange, symbol, start_ms, end_ms):
+        """
+        Downloads trade data from Backblaze B2 storage.
+
+        @param exchange: The exchange name associated with the data.
+        @param symbol: The trading symbol associated with the data.
+        @param start_ms: The start time in milliseconds for downloading data.
+        @param end_ms: The end time in milliseconds for downloading data.
+
+        @return: The result of the download operation.
+        """
         return self.download("trades", exchange, symbol, start_ms, end_ms)
 
     def download_real_time_funding(self, exchange, symbol, start_ms, end_ms):
+        """
+         @brief Download real time funding data from Deribit. This is a wrapper around
+         @param exchange exchange to download data from
+         @param symbol symbol of the data to download ( ex. BTCUSD etc. )
+         @param start_ms start time in milliseconds from which to download data
+         @param end_ms end time in milliseconds from which to download data
+         @return dictionary with keys " success " ( boolean ) and " error " ( str
+        """
+        # Download the funding time of the exchange
         if exchange == 'Deribit':
             return self.download("real_time_funding", exchange, symbol, start_ms, end_ms)
 
     def download_funding(self, exchange, symbol, start_ms, end_ms):
+        """
+         @brief Download funds from an exchange. This is a wrapper around the download method of the Cerebrum API.
+         @param exchange The exchange to download funds from. Can be Deribit or Telepathy.
+         @param symbol The symbol of the funding transaction you wish to download.
+         @param start_ms The start time in milliseconds to download from.
+         @param end_ms The end time in milliseconds to download to.
+         @return A dictionary containing the following keys. status The Status of the request ( error | success ). message The message to send with the request. date The date on which the transaction was received
+        """
+        # Download a funding exchange.
         if exchange != 'Deribit':
             return self.download("funding", exchange, symbol, start_ms, end_ms)
 
     def download(self, base_path, exchange, symbol, start_ms, end_ms):
+        """
+         @brief Download data from exchange. This is a wrapper around download_data that takes care of creating the file and writing it to the file system.
+         @param base_path The path to the download directory.
+         @param exchange The exchange we are downloading data from. Must be one of the exchanges listed in exchange.
+         @param symbol The symbol we are downloading data for. Must be one of the exchanges listed in exchange.
+         @param start_ms The start time of the data to download in milliseconds since January 1 1970.
+         @param end_ms The end time of the data to download in milliseconds since January 1 1970
+        """
         ##---------------##
         start = (datetime.fromtimestamp(start_ms / 1000)).date()
         end = (datetime.fromtimestamp(end_ms / 1000))
         # If the end date does not end on 12 AM we need to add one day to the end date
+        # If the end is not zero add days to the end of the interval.
         if not (end.hour == 0 and end.minute == 0 and end.second == 0):
             end = end + timedelta(days=1)
         end = end.date()
@@ -262,6 +439,13 @@ class DataFetcher:
         return True
 
     def download_from_backblaze(self, base_path, filename, exchange, symbol):
+        """
+         @brief Download parquet file from backblaze and store it in base_path
+         @param base_path Path to store parquet file in
+         @param filename Name of file to download ( without extension )
+         @param exchange Exchange that we are downloading from ( exchanges. parquet )
+         @param symbol Symbol of the exchange ( exchanges. parquet
+        """
         print(f"Ready to download parquet file {base_path}/{filename}")
         # backblaze
         b2_api = B2Api()
@@ -294,6 +478,13 @@ class DataFetcher:
 class SimulationsDataQuality:
 
     def __init__(self, t_start, t_end, exchange, symbol):
+        """
+         @brief Initialize the SpikeTravel object. This is the constructor for SpikeTravel objects
+         @param t_start Start time of the time period in ISO 8601 format. If this is set to - 1 it will be set to the current time.
+         @param t_end End time of the time period in ISO 8601 format. If this is set to - 1 it will be set to the current time.
+         @param exchange The exchange to which the spotswap is bound.
+         @param symbol The symbol associated with the spotswap in international
+        """
         self.t_start = t_start
         self.t_end = t_end
         self.exchange = exchange
@@ -301,10 +492,16 @@ class SimulationsDataQuality:
         self.client = InfluxConnection.getInstance().staging_client_spotswap
 
     def start(self):
+        """
+         @brief Starts the test. This is called by the start_loop method and should be overridden by subclasses
+        """
         print("Test")
         self.check_price_data()
 
     def check_price_data(self):
+        """
+         @brief Check price data from exchange and symbol. Returns pandas. DataFrame Dataframe with timestamp price
+        """
         result = self.client.query(f'''SELECT "price","side" FROM "price" WHERE ("exchange" = '{self.exchange}' AND
                                              symbol = '{self.symbol}') AND time > '{self.t_start}' AND time < '{self.t_end}' ''')
         points = result.get_points()
@@ -320,6 +517,9 @@ class SimulationsDataQuality:
         print(no_data.head())
 
     def check_taker_trades_data(self):
+        """
+         @brief Check trade data from taker trading system and print to console. This is a helper function for test_trades
+        """
         result = self.client.query(f'''SELECT "price","size" FROM "trade" WHERE ("exchange" = '{self.exchange}' AND
                                              symbol = '{self.symbol}') AND time > '{self.t_start}' AND time < '{self.t_end}' ''')
         points = result.get_points()
@@ -328,6 +528,9 @@ class SimulationsDataQuality:
         print(prices.head())
 
     def check_funding_data(self):
+        """
+         @brief Queries Funding data and prints prices to console. This is a helper method for testing
+        """
         result = self.client.query(f'''SELECT "funding" FROM "funding" WHERE ("exchange" = '{self.exchange}' AND
                                              symbol = '{self.symbol}') AND time > '{self.t_start}' AND time < '{self.t_end}' ''')
         points = result.get_points()
@@ -345,6 +548,14 @@ class AutomatedSimulation:
     controllers_state = []
 
     def __init__(self, symbol, sweep_id, t_start, t_end, name="Estimated PNL with Realized Quanto_profit"):
+        """
+         @brief Initialize the Automated Simulation. This is the method that will be called by the simulation when it starts
+         @param symbol symbol of the PNL to be simulated
+         @param sweep_id sweep id of the PNL to be simulated
+         @param t_start start time of the sweep in seconds
+         @param t_end end time of the sweep in seconds
+         @param name name of the PNL to be simulated ( default " Estimated PNL with Realized Quanto_profit "
+        """
         print("Automated Simulation Started...")
         self.project = "automation_test"
         self.symbol = symbol
@@ -357,10 +568,16 @@ class AutomatedSimulation:
         self.postgres_connection = PostgresConnection()
 
     def connect_to_wandb(self):
+        """
+         @brief Connect to wandb and set self. api to the api object. This is called by __init__
+        """
         wandb.login(key=self.wandb_key, host=self.wandb_host)
         self.api = wandb.Api()
 
     def start(self):
+        """
+         @brief Starts Wandb and performs training and merge results. This is the first step in the workflow
+        """
         self.connect_to_wandb()
         self.init_confirmations()
         self.start_training(agents=30)
@@ -369,14 +586,26 @@ class AutomatedSimulation:
         self.merge_results()
 
     def init_confirmations(self):
+        """
+         @brief Initialize confirmations. This is called before the user is logged in and can be used to perform actions such as setting password etc.
+         @return True if confirmation is initialized False if not and exception is
+        """
         return
 
     def start_training(self, agents):
+        """
+         @brief Start training for a set of agents. This is a blocking call and will return when the training is started or an error occurs
+         @param agents A list of agent names
+         @return True if the training was started False if it was
+        """
         print(f"----- [Step1]: Start training for sweep {self.sweep_id}")
         started = False
+        # Start the sweep for sweeps.
         while not started:
+            # Start the sweep for sweeps.
             for host in HOSTS:
 
+                # Start the sweep for sweeps.
                 if self.is_host_available(host) and self.training_hosts_len > len(self.training_hosts):
                     self.training_hosts.append(host)
                     cmd = f"ssh {host} 'python src/simulations_management/start_sweep.py " \
@@ -390,6 +619,7 @@ class AutomatedSimulation:
                     print(f"----- [Step1]: Training for sweep {self.sweep_id} started...")
                     self.postgres_connection.update_simulation(sweep_id=self.sweep_id, status="training")
                     self.postgres_connection.update_simulation_host(host=host, attached=False, available=False)
+                    # If training hosts are not in the training hosts list then start the training process.
                     if self.training_hosts_len == len(self.training_hosts):
                         started = True
                         break
@@ -398,35 +628,66 @@ class AutomatedSimulation:
         return
 
     def get_training_results_and_start_controllers(self):
+        """
+         @brief Get training results from wandb and start local controllers if they are not
+        """
         print(f"----- [Step2]: Get training results from wandb")
         training_finished = 0
+        # This function is called by the training loop.
         while training_finished < len(self.training_hosts):
+            # This method is called by the sweep to determine if the sweep is still running at the host.
             for host in self.training_hosts:
+                # This method is called when the sweep is running at the host.
                 if is_training_running(host, self.sweep_id):
                     print(f"----- [Step2]: Training for sweep {self.sweep_id} is still running at host {host}")
                 else:
                     training_finished += 1
+                # If training_hosts_len is training_finished then we can t use this method to determine if we have finished training.
                 if self.training_hosts_len == training_finished:
                     break
             sleep(60)
         print(f"----- [Step2]: Training for sweep {self.sweep_id} finished")
         self.postgres_connection.update_simulation(sweep_id=self.sweep_id, status="running_controllers")
+        # Start local controllers for each sweep_id in self. controllers_state.
         for index, controller in enumerate(self.controllers_state):
             self.start_local_controller(sweep_id=controller["sweep_id"], index=index)
 
     @staticmethod
     def setup_and_run(symbol, file, t_start, t_end):
+        """
+         @brief Sets up and runs the program. This is called by L { setup_and_run } and should return a tuple of the program's exit code and an error message if there was an error.
+         @param symbol The symbol being run. This is used to identify the location of the program in the symbol table.
+         @param file The file where the program is being run.
+         @param t_start The start of the time range that will be used to generate the symbol table.
+         @param t_end The end of the time range that will be used to generate the symbol table.
+         @return A 2 - tuple of ( exit code error message
+        """
         return
 
     @staticmethod
     def init_sweep_and_start_container(name, time_from, time_to):
+        """
+         @brief Starts a Sweep and sweeps the container. This is a wrapper around init_sweep and start_container to avoid having to worry about the order of the parameters
+         @param name Name of the container to start
+         @param time_from Start time in seconds from which the container will be sweeped
+         @param time_to Start time in seconds until which the container will be sweeped
+         @return True if successful False if not ( in which case an exception is
+        """
         return
 
     def start_local_controller(self, sweep_id, index):
+        """
+         @brief Start a local controller. This will be called by : py : meth : ` start_sweeps ` and
+         @param sweep_id The sweep that is being started
+         @param index The index of the
+        """
         print(f"----- [Step3]: Start local controller {sweep_id}")
         started = False
+        # This function is called by the controller_specific_combinations. py.
         while not started:
+            # This method will attempt to connect to the controller with the given host.
             for host in HOSTS:
+                # This method will set the host to the host and set the controller s host to the given host.
                 if self.is_host_available(host):
                     self.controllers_state[index]['host'] = host
                     cmd = f""" ssh {host} 'python src/scripts/wandb_sweeps/controller_specific_combinations.py --sweep_id="{sweep_id}" --source_sweep_id="{self.sweep_id}" --custom_filter="global_filter" --project_name={self.project} ' """
@@ -441,9 +702,14 @@ class AutomatedSimulation:
             sleep(60)
 
     def wait_for_controllers_and_start_confirmations(self):
+        """
+         @brief Wait for controllers to start confirmations Args : None Returns : None Purpose : This method is used to wait for all controllers to start confirm
+        """
         print(f"----- [Step4]: Wait for controllers")
+        # This method will wait for all the controllers to finish.
         for controller in self.controllers_state:
             finished = False
+            # Wait for the controller to finish.
             while not finished:
                 finished = not is_controller_running(controller["sweep_id"], controller["host"])
                 sleep(60)
@@ -451,9 +717,16 @@ class AutomatedSimulation:
         self.postgres_connection.update_simulation(sweep_id=self.sweep_id, status="running_confirmations")
 
     def start_confirmation(self, sweep_id, host):
+        """
+         @brief Start sweep and wait for it to be started. This is a blocking call and will return after the sweep has been started.
+         @param sweep_id ID of the sweep to start
+         @param host IP address of the host to start the sweep
+        """
         print(f"----- [Step5]: Start confirmation {sweep_id}")
         started = False
+        # Starts sweeps for the given sweep.
         while not started:
+            # If host is available for sweeps.
             if self.is_host_available(host):
                 cmd = f""" ssh {host} 'python src/simulations_management/start_sweep.py --sweep_id {sweep_id} --num_agents 30' """
                 # process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -467,9 +740,14 @@ class AutomatedSimulation:
             sleep(60)
 
     def merge_results(self):
+        """
+         @brief Merge results from all controllers and save to postgres Args : None Returns :
+        """
         print(f"----- [Step6]: Wait for confirmations")
+        # This function is called by the controller to check if the controller is running.
         for confirmation in self.controllers_state:
             finished = False
+            # Wait for the training to finish.
             while not finished:
                 finished = not is_training_running(sweep_id=confirmation["sweep_id"], host=confirmation["host"])
                 sleep(60)
@@ -483,15 +761,22 @@ class AutomatedSimulation:
         print(cmd)
 
     def is_host_available(self, host):
+        """
+         @brief Check if a host is available to run a sweep. This is a blocking call so it will wait for 3 seconds before returning
+         @param host The host to check.
+         @return True if the host is available False otherwise. Note that this method does not check if the sweep is attached
+        """
         attached = True
         available = False
         retries = 0
+        # Attempts to connect to the host and return the attached connection
         while attached and retries < 3:
             sleep(10)
             result = self.postgres_connection.query_simulation_host(host=host)
             attached = result[1]
             available = result[2]
             retries += 1
+        # Check if the host is attached to the simulation host
         if not attached:
             self.postgres_connection.update_simulation_host(host=host, attached=True, available=available)
             # Check if there is any sweep running
@@ -501,6 +786,7 @@ class AutomatedSimulation:
             out, err = process.communicate()
             # print(out, err)
             print(out.decode('utf-8').strip())
+            # If sweep is currently running at host
             if "sweep" in out.decode('utf-8').strip():
                 print(
                     f"A sweep with id {out.decode('utf-8').strip().split('_')[1]} is currently running at host {host}")
@@ -514,6 +800,7 @@ class AutomatedSimulation:
             out, err = process.communicate()
             # print(out, err)
             print(out.decode('utf-8').strip())
+            # If the controller is currently running at host
             if int(out.decode('utf-8').strip()) > 2:
                 print(f"A controller is currently running at host {host}")
                 self.postgres_connection.update_simulation_host(host=host, attached=False, available=False)
@@ -528,10 +815,18 @@ class AutomatedSimulationETHUSDMultiperiod(AutomatedSimulation):
 
     @staticmethod
     def setup_and_run(symbol, file, t_start, t_end):
+        """
+        @brief Setup and run the automated simulation. This is a wrapper for the Docker build command and run it
+        @param symbol symbol to use for the simulation
+        @param file file to use for the simulation ( must be a string )
+        @param t_start start time of the simulation in seconds
+        @param t_end end time of the simulation in seconds
+        """
 
         build_command = f"cd ../../ && docker build -f Dockerfile.automated_simulation -t {image} ."
         process = subprocess.Popen(build_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         out = process.communicate()
+        # If naming to docker. io image done print out out 0. decode utf 8. strip out 0. decode utf 8. strip
         if f"naming to docker.io/{image} done" not in (out[0].decode('utf-8').strip()):
             print(out[0].decode('utf-8').strip())
             exit(1)
@@ -638,7 +933,11 @@ class AutomatedSimulationETHUSDMultiperiod(AutomatedSimulation):
         return
 
     def init_confirmations(self):
+        """
+        @brief Initialize confirmations for each controller and store them in the database. @ In None @ Out
+        """
 
+        # Sweep the controllers to the controller state.
         for i in range(self.total_controllers):
             CONTROLLER_CONF["parameters"]["t_end"]["value"] = CONTROLLER_CONFS_TIMESTAMPS[i]["t_end"]
             CONTROLLER_CONF["parameters"]["t_start"]["value"] = CONTROLLER_CONFS_TIMESTAMPS[i]["t_start"]
@@ -654,17 +953,26 @@ class AutomatedSimulationETHUSDMultiperiod(AutomatedSimulation):
         )
 
 
+# This is a class that implements the AbstractAutomatedSimulationSinglePeriod interface. All controllers are added to the state
 class AutomatedSimulationSinglePeriod(AutomatedSimulation):
     total_controllers = 4
     controllers_state = []
 
     @staticmethod
     def setup_and_run(symbol, file, time_from, time_to):
+        """
+        @brief Setup and run the automated simulation. This is the function that does the setup and run of the simulations
+        @param symbol symbol to be used as parameter
+        @param file path to the csv file containing the parameters to be used
+        @param time_from start time of the simulation in seconds from now ( inclusive ). Default is 0.
+        @param time_to end time of the simulation in seconds to end ( inclusive ). Default is
+        """
 
         build_command = f"cd ../../ && docker build -f Dockerfile.automated_simulation -t {image} ."
         print(build_command)
         process = subprocess.Popen(build_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         out = process.communicate()
+        # If naming to docker. io image done print out out 0. decode utf 8. strip out 0. decode utf 8. strip
         if f"naming to docker.io/{image} done" not in (out[0].decode('utf-8').strip()):
             print(out[0].decode('utf-8').strip())
             exit(1)
@@ -680,6 +988,11 @@ class AutomatedSimulationSinglePeriod(AutomatedSimulation):
 
     @staticmethod
     def get_parameters_from_csv(filename):
+        """
+            @brief Get parameters from csv file. This function is used to get the parameters from csv file
+            @param filename name of the csv file
+            @return dataframe with the parameters as index and the window size as
+        """
         print(f"----- [Step1]: Get parameters from csv file {filename}")
         df = None
         try:
@@ -693,6 +1006,16 @@ class AutomatedSimulationSinglePeriod(AutomatedSimulation):
 
     @staticmethod
     def init_sweep_and_start_containers(name, symbol, t_start, t_end, params_df=None):
+        """
+         @brief Initialize and start containers. Sweep parameters are defined in params_df which is a dataframe with columns : name ( str ) : Name of the sweep. symbol ( str ) : Symbol to use for the sweep.
+         @param name ( str ) Name of the metric.
+         @param symbol ( str ) The symbol to use for the sweep.
+         @param t_start ( float ) Start time in seconds.
+         @param t_end ( float ) End time in seconds.
+         @param params_df ( pandas. DataFrame ) Dataframe with parameters.
+         @return ( dict ) A dictionary with sweep parameters and their start
+        """
+        # This method is used to perform the sweeps of the given parameters.
         for index, row in params_df.iterrows():
 
             sweep_configuration = {
@@ -723,6 +1046,7 @@ class AutomatedSimulationSinglePeriod(AutomatedSimulation):
                 }
             }
 
+            # Set the value of the parameter for each column in the row.
             for col, value in row.items():
                 sweep_configuration["parameters"][f"{col}"] = {
                     "distribution": "constant",
@@ -753,6 +1077,10 @@ class AutomatedSimulationSinglePeriod(AutomatedSimulation):
         return
 
     def init_confirmations(self):
+        """
+         @brief Initialize confirmations for each controller and store in postgres. This is called at the beginning of the test
+        """
+        # Sweep the controllers in the controller state.
         for i in range(self.total_controllers):
             CONTROLLER_CONFS[i]["program"] = SYMBOL_PROGRAM[self.symbol]
             # print(json.dumps(CONTROLLER_CONFS[i]["program"], indent=2))

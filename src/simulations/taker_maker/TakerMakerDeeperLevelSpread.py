@@ -14,8 +14,77 @@ warnings.filterwarnings("ignore")
 t = TicToc()
 t.tic()
 
-
 class TakerMakerDeeperLevelSpread(TakerMakerFunctions):
+    """
+    A class representing a trading strategy that utilizes a state machine to manage the trading process.
+
+    This class inherits from `TakerMakerFunctions` and uses the `transitions` library to define a state machine
+    for managing trading states such as posting, executing, cancelling, and balancing trades in a cryptocurrency
+    market.
+
+    Attributes:
+        states (list): A list of dictionaries defining the different states in the trading process.
+        source (str): The source state of the last transition.
+        final_spread (float): The final spread value of the executed trade.
+        df (pandas.DataFrame): DataFrame containing market data and trading information.
+        timestamp (int): The current timestamp in the trading process.
+        timestamps (numpy.ndarray): Array of timestamps from the DataFrame.
+        side (str): The current trading side ('entry' or 'exit').
+        position_current_timestamp (int): Index of the current timestamp in the DataFrame.
+        spot_fee (float): The trading fee for spot trades.
+        swap_fee (float): The trading fee for swap trades.
+        area_spread_threshold (float): Threshold for area spread.
+        area_spread_value (float): The value of the area spread.
+        latency_spot (int): Latency for spot trades.
+        latency_swap (int): Latency for swap trades.
+        latency_try_post (int): Latency for trying to post an order.
+        latency_cancel (int): Latency for cancelling an order.
+        latency_spot_balance (int): Latency for spot balance.
+        environment (str): The trading environment (e.g., 'test', 'live').
+        spread_entry (float): The spread for entry trades.
+        spread_exit (float): The spread for exit trades.
+        entry_band (float): The entry band value.
+        exit_band (float): The exit band value.
+        verbose (bool): Flag to enable verbose logging.
+        exchange_swap (str): The exchange for swap trades.
+        swap_instrument (str): The swap instrument being traded.
+        spot_instrument (str): The spot instrument being traded.
+        max_position (float): The maximum allowed position size.
+        max_trade_volume (float): The maximum trade volume.
+        depth_posting_predictor (object): An object for predicting order depth.
+        funding_system (str): The funding system used ('Quanto_loss', 'Quanto_profit', or other).
+        temporary_order_swap (LimitOrder): Temporary swap order object.
+        limit_orders_swap (list): List of swap limit orders.
+        cancelled_orders_swap (list): List of cancelled swap orders.
+        executed_while_cancelling_orders_swap (list): List of orders executed while cancelling.
+        executions (list): List of executed orders.
+        taker_execution_spot (TakerExecution): Taker execution for spot trades.
+        taker_execution_swap (TakerExecution): Taker execution for swap trades.
+        need_to_post_deeper__ (bool): Flag indicating whether to post a deeper order.
+        swap_market_tick_size (float): The tick size for the swap market.
+        w_avg_price_btc (float): Weighted average price of BTC.
+        w_avg_price_eth (float): Weighted average price of ETH.
+        coin_volume (float): Volume of the traded coin.
+        minimum_distance (float): Minimum distance for bands.
+        max_quanto_profit (float): Maximum profit for Quanto strategy.
+        quanto_profit_triggered (bool): Flag indicating whether Quanto profit was triggered.
+        cum_volume (float): Cumulative volume of trades.
+        list_trying_post_counter (list): List of timestamps and sides for posting attempts.
+        traded_volume (float): Volume of the last trade.
+        total_volume_traded (float): Total traded volume.
+        time_post (int): Timestamp of the order post.
+        entry_band_adjustment (float): Adjustment for the entry band.
+        exit_band_adjustment (float): Adjustment for the exit band.
+        order_depth (float): Depth of the current order.
+        predicted_depth (float): Predicted depth of the order.
+        idx (int): Index for accessing DataFrame rows.
+        previous_timestamp (int): The previous timestamp for calculations.
+        price_btc (pandas.DataFrame): DataFrame containing BTC price data.
+        price_eth (pandas.DataFrame): DataFrame containing ETH price data.
+        taker_volume_df (pandas.DataFrame): DataFrame containing taker volume data.
+        machine (Machine): State machine managing the trading states.
+    """
+
     # Define the states of the trading:
     states = [{'name': 'clear', 'on_exit': ['reset_depth']},
               {'name': 'trying_to_post',
@@ -32,6 +101,33 @@ class TakerMakerDeeperLevelSpread(TakerMakerFunctions):
                  latency_cancel, latency_spot_balance, max_position, max_trade_volume, environment, exchange_swap,
                  swap_instrument, spot_instrument, funding_system, minimum_distance, minimum_value, trailing_value,
                  disable_when_below, depth_posting_predictor, swap_market_tick_size=0.5, verbose=False):
+        """
+        Initializes the TakerMakerDeeperLevelSpread class.
+
+        @param df: DataFrame containing market data and trading information.
+        @param spot_fee: Trading fee for spot trades.
+        @param swap_fee: Trading fee for swap trades.
+        @param area_spread_threshold: Threshold for area spread.
+        @param latency_spot: Latency for spot trades.
+        @param latency_swap: Latency for swap trades.
+        @param latency_try_post: Latency for trying to post an order.
+        @param latency_cancel: Latency for cancelling an order.
+        @param latency_spot_balance: Latency for spot balance.
+        @param max_position: Maximum allowed position size.
+        @param max_trade_volume: Maximum trade volume.
+        @param environment: Trading environment (e.g., 'test', 'live').
+        @param exchange_swap: Exchange for swap trades.
+        @param swap_instrument: Swap instrument being traded.
+        @param spot_instrument: Spot instrument being traded.
+        @param funding_system: Funding system used ('Quanto_loss', 'Quanto_profit', or other).
+        @param minimum_distance: Minimum distance for bands.
+        @param minimum_value: Minimum value for trailing calculations.
+        @param trailing_value: Trailing value for calculations.
+        @param disable_when_below: Disable condition when value is below this threshold.
+        @param depth_posting_predictor: Object for predicting order depth.
+        @param swap_market_tick_size: Tick size for the swap market (default is 0.5).
+        @param verbose: Flag to enable verbose logging (default is False).
+        """
         self.source = None
         self.final_spread = 0
         self.df = df

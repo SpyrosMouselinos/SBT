@@ -26,6 +26,11 @@ load_dotenv(find_dotenv())
 
 
 def pnl_smotheness_func(df):
+    """
+     @brief Calculates Penrose smotheness and AAD for a dataframe.
+     @param df pandas DataFrame to be analysed. Should have column'last '
+     @return r_sq aad avg_dist : float
+    """
     y_array = df['last'].to_numpy()
     x_array = np.arange(len(df)).reshape(-1, 1)
     model = LinearRegression()
@@ -39,6 +44,31 @@ def pnl_smotheness_func(df):
 
 
 def simulation_trader(params):
+    """
+    @brief Simulates trading activities using a specified set of parameters and market data.
+
+    The function models a trading strategy's behavior over a defined period, using various parameters to control the simulation environment, trading strategy, and market conditions. It returns detailed simulation results, including metrics on execution quality, profit and loss, and trading volumes.
+
+    @param params Dictionary containing the simulation parameters, including:
+    - Market conditions: `band`, `lookback`, `recomputation_time`, etc.
+    - Trading strategy settings: `target_percentage_exit`, `target_percentage_entry`, `entry_opportunity_source`, etc.
+    - Operational parameters: `latency_spot`, `latency_swap`, `spot_fee`, `swap_fee`, etc.
+    - Time settings: `t_start`, `t_end`.
+
+    @return tuple Contains the following elements:
+    - params_dict: Dictionary of simulation parameters used.
+    - simulation_describe: DataFrame summarizing simulation results and performance metrics.
+    - df_total: DataFrame with detailed execution data.
+    - duration_pos_df: DataFrame with the duration of trading positions.
+    - file_id: Unique identifier for the simulation run.
+    - wandb_summary: Dictionary summarizing key metrics for WANDB tracking.
+    - band_values: DataFrame with band values used in the simulation.
+    - model: The trading model instance used in the simulation.
+    - pnl_daily_df: DataFrame with daily PNL (profit and loss) values.
+    - rate_limit_df: DataFrame with rate limit data tracked during the simulation.
+
+    The simulation models the execution of trades based on market conditions, strategy logic, and trading parameters, providing insights into the strategy's performance over the simulated period.
+    """
     t = TicToc()
     t.tic()
 
@@ -980,6 +1010,17 @@ def simulation_trader(params):
 
 def upload_to_backblaze(params_dict, simulation_describe, df_total, duration_pos_df, params, file_id, bands_df,
                         rate_limit_df):
+    """
+    @brief Upload data to Backblaze. This is a wrapper around upload_to_blood_file that takes care of the following : Funding the file with one or more bands and sending it to Backblaze
+    @param params_dict Dictionary of parameters for the simulation
+    @param simulation_describe Description of the simulation ( used to generate report )
+    @param df_total Total time series of data to upload
+    @param duration_pos_df Data frame containing the duration of each file in seconds since the beginning of the simulation. If there are multiple files in the simulation they will be combined into a single dataframe
+    @param params Dictionary of upload parameters. See below for details
+    @param file_id File ID ( not UUID )
+    @param bands_df Data frame containing the band names ( can be empty )
+    @param rate_limit_df Data frame containing the rate limit
+    """
     strategy = params['strategy']
     t_start = params['t_start']
     t_end = params['t_end']
@@ -1052,6 +1093,12 @@ def upload_to_backblaze(params_dict, simulation_describe, df_total, duration_pos
 
 
 def resample_band_df(bands_df, band_columns):
+    """
+     @brief Resamples band_df to fit the timems. This is done by dropping duplicate entries and re - index the index
+     @param bands_df a dataframe with bands to be resampled
+     @param band_columns a list of column names that should be resampled
+     @return a dataframe with resampled bands ( entry exit )
+    """
     # print("##################################### resample_band_df ###############################################")
     # print(f"bands_df: {bands_df}")
     bands_df[band_columns].drop_duplicates(subset=band_columns, keep='last', inplace=True)
@@ -1067,14 +1114,22 @@ def resample_band_df(bands_df, band_columns):
     bands_to_upload_exit = bands_df[exit_bands].resample('5T', on='Time').min()
     bands_to_upload = pd.merge_ordered(bands_to_upload_entry, bands_to_upload_exit, on='timems')
     # print(f"bands_to_upload: {bands_to_upload}")
+    # Drop the time_x and time_y columns from bands_to_upload. columns
     if 'Time_x' in bands_to_upload.columns or 'Time_y' in bands_to_upload.columns:
         bands_to_upload = bands_to_upload.drop(columns=['Time_x', 'Time_y'])
+    # Drop the time column from bands_to_upload. columns
     if 'Time' in bands_to_upload.columns:
         bands_to_upload = bands_to_upload.drop(columns=['Time'])
     return bands_to_upload
 
 
 def upload_to_wandb(params, wandb_summary):
+    """
+     @brief Upload data to wandb. This is a wrapper for the W&B API
+     @param params Dictionary with the test parameters
+     @param wandb_summary String with the summary of the
+    """
+    # This function is called by the WANDB server to login the WANDB server if not already logged in.
     if not params.get('already_logged_in', False):
         wandb.login(host=os.getenv("WANDB_HOST"))
         wandb.init(project=TAKER_MAKER_PROJECT, entity=WANDB_ENTITY)
@@ -1086,6 +1141,11 @@ def upload_to_wandb(params, wandb_summary):
 
 
 def upload_altcoin_summary_to_wandb(params):
+    """
+     @brief Upload altcoin summary to Wandb. This is a blocking call and will return after the upload is complete
+     @param params Dictionary containing the test
+    """
+    # Logs in the WANDB database.
     if not params.get('already_logged_in', False):
         wandb.login(host=os.getenv("WANDB_HOST"))
         wandb.init(project=TAKER_MAKER_PROJECT, entity=WANDB_ENTITY)

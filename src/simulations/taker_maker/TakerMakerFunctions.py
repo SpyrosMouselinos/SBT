@@ -20,18 +20,68 @@ t.tic()
 
 
 def get_spread_entry(entry_swap, entry_spot, swap_fee, spot_fee):
+    """
+    Calculate the spread for entering a trade.
+
+    This function computes the effective spread when entering a trade, considering fees.
+
+    @param entry_swap: The entry price on the swap market.
+    @param entry_spot: The entry price on the spot market.
+    @param swap_fee: The transaction fee for the swap market.
+    @param spot_fee: The transaction fee for the spot market.
+
+    @return: The calculated entry spread.
+    """
     return entry_swap * (1 - swap_fee) - entry_spot * (1 + spot_fee)
 
 
 def get_spread_exit(exit_swap, exit_spot, swap_fee, spot_fee):
+    """
+    Calculate the spread for exiting a trade.
+
+    This function computes the effective spread when exiting a trade, considering fees.
+
+    @param exit_swap: The exit price on the swap market.
+    @param exit_spot: The exit price on the spot market.
+    @param swap_fee: The transaction fee for the swap market.
+    @param spot_fee: The transaction fee for the spot market.
+
+    @return: The calculated exit spread.
+    """
     return exit_swap * (1 + swap_fee) - exit_spot * (1 - spot_fee)
 
 
 class LimitOrder:
+    """
+    A class representing a limit order.
+
+    This class encapsulates the properties and behaviors of a limit order in a trading system.
+    """
+
     def __init__(self, timestamp_posted, price, is_executed, side, is_spot, targeted_spread, volume_executed,
                  max_targeted_depth, cancelled_to_post_deeper=False, timestamp_cancelled=None,
                  price_other_exchange=None, was_trying_to_cancel=False, id_=1, source_at_execution=None,
                  dest_at_execution=None, amount=0):
+        """
+        Initializes a new instance of the LimitOrder class.
+
+        @param timestamp_posted: The timestamp when the order was posted.
+        @param price: The price of the order.
+        @param is_executed: A boolean indicating whether the order has been executed.
+        @param side: The side of the order, either 'Bid' or 'Ask'.
+        @param is_spot: A boolean indicating whether the order is a spot order.
+        @param targeted_spread: The targeted spread for the order.
+        @param volume_executed: The volume executed for the order.
+        @param max_targeted_depth: The maximum targeted depth for the order.
+        @param cancelled_to_post_deeper: A boolean indicating whether the order was cancelled to post deeper.
+        @param timestamp_cancelled: The timestamp when the order was cancelled.
+        @param price_other_exchange: The price of the order on the other exchange.
+        @param was_trying_to_cancel: A boolean indicating whether the order was attempting to be cancelled.
+        @param id_: The ID of the order.
+        @param source_at_execution: The source at execution for the order.
+        @param dest_at_execution: The destination at execution for the order.
+        @param amount: The amount of the order.
+        """
         self.timestamp_posted = timestamp_posted
         self.timestamp_executed = None
         self.price = price
@@ -52,8 +102,27 @@ class LimitOrder:
 
 
 class TakerExecution:
+    """
+    A class representing a taker execution.
+
+    This class encapsulates the properties and behaviors of a taker execution in a trading system.
+    """
+
     def __init__(self, timestamp_posted, targeted_price, executed_price, side, is_spot, volume_executed,
                  source_at_execution=None, dest_at_execution=None, amount=0):
+        """
+        Initializes a new instance of the TakerExecution class.
+
+        @param timestamp_posted: The timestamp when the execution was posted.
+        @param targeted_price: The targeted price for the execution.
+        @param executed_price: The executed price for the execution.
+        @param side: The side of the execution, either 'Bid' or 'Ask'.
+        @param is_spot: A boolean indicating whether the execution is a spot execution.
+        @param volume_executed: The volume executed for the execution.
+        @param source_at_execution: The source at execution for the order.
+        @param dest_at_execution: The destination at execution for the order.
+        @param amount: The amount of the execution.
+        """
         self.timestamp_posted = timestamp_posted
         self.timestamp_executed = None
         self.targeted_price = targeted_price
@@ -69,17 +138,53 @@ class TakerExecution:
 
 
 class TakerMakerFunctions(object):
+    """
+    A class encapsulating functions for taker and maker orders.
+
+    This class provides methods to manage and execute taker and maker orders in a trading strategy.
+    """
+
     def set_order_depth(self, new_depth):
+        """
+        Sets the order depth for the trading strategy.
+
+        This function updates the order depth to the specified value.
+
+        @param new_depth: The new order depth to be set.
+        """
         # @TODO decide the unit of the order depth
         self.order_depth = new_depth
 
     def reset_depth(self, event):
+        """
+        Resets the predicted depth.
+
+        This function resets the predicted depth to None when triggered by an event.
+
+        @param event: The event that triggers the depth reset.
+        """
         self.predicted_depth = None
 
     def reset_boolean_depth(self, event):
+        """
+        Resets the boolean flag for posting deeper.
+
+        This function resets the flag indicating the need to post deeper when triggered by an event.
+
+        @param event: The event that triggers the boolean depth reset.
+        """
         self.need_to_post_deeper__ = False
 
     def is_order_too_deep(self, event):
+        """
+        Checks if the order is too deep in the order book.
+
+        This function determines if the order is too deep in the order book based on the targeted depth.
+
+        @param event: The event that triggers the check.
+
+        @return: True if the order is too deep, False otherwise.
+        """
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
 
         entry_swap = self.df.loc[idx_lat_swap, 'price_swap_entry']
@@ -106,6 +211,13 @@ class TakerMakerFunctions(object):
 
     @property
     def need_to_post_deeper(self):
+        """
+        Determines if there is a need to post orders deeper in the order book.
+
+        This function predicts the depth to post orders at and checks if it is greater than the current depth.
+
+        @return: True if there is a need to post deeper, False otherwise.
+        """
         self.predicted_depth = self.depth_posting_predictor.where_to_post(self.timestamp)
         # self.depth_posting_predictor.need_to_post_deeper(*args)
         # predicted depth is larger than current depth -> re-post
@@ -118,16 +230,24 @@ class TakerMakerFunctions(object):
         return False
 
     def compute_volume_size(self):
+        """
+        Computes the volume size for trades.
+
+        This function calculates the traded volume based on the maximum trade volume.
+
+        @return: The computed traded volume.
+        """
         traded_volume = self.max_trade_volume
         return traded_volume
 
     def find_known_values_index(self):
-        '''
-        Find the index (timestamp) of the known spot and swap prices.
-        Known values: values we know at any time moment and include a latency concern the time we receive the
-        information of a new price.
-        '''
+        """
+        Finds the index of known spot and swap prices.
 
+        This function determines the indices of known spot and swap prices, considering latency.
+
+        @return: A tuple containing the indices of known spot and swap prices.
+        """
         df = self.df
         if self.timestamp - self.latency_spot >= df.index[0]:
             # position_current_timestamp = df.index.get_loc(self.timestamp)
@@ -150,12 +270,37 @@ class TakerMakerFunctions(object):
         return idx_lat_spot, idx_lat_swap
 
     def entry_band_fn(self, event):
+        """
+        Computes the entry band value.
+
+        This function calculates the entry band value based on the dataframe and entry band adjustment.
+
+        @param event: The event triggering the computation.
+
+        @return: The calculated entry band value.
+        """
         return self.df['Entry Band'].iloc[self.idx] + self.entry_band_adjustment
 
     def exit_band_fn(self, event):
+        """
+        Computes the exit band value.
+
+        This function calculates the exit band value based on the dataframe and exit band adjustment.
+
+        @param event: The event triggering the computation.
+
+        @return: The calculated exit band value.
+        """
         return self.df['Exit Band'].iloc[self.idx] - self.exit_band_adjustment
 
     def add_temp_order_to_orders(self, event):
+        """
+        Adds a temporary order to the list of orders.
+
+        This function adds a temporary order to the list of swap limit orders and resets the temporary order.
+
+        @param event: The event triggering the addition.
+        """
         if self.temporary_order_swap is not None:
             if self.verbose:
                 band = self.df.loc[self.timestamp]["Entry Band"] if self.side == 'entry' else \
@@ -166,10 +311,13 @@ class TakerMakerFunctions(object):
             self.temporary_order_swap = None
 
     def spread_available(self):
-        '''
-        Find the spread of the known values
-        '''
+        """
+        Determines if the spread is available for trading.
 
+        This function checks if the spread meets the criteria for entry or exit, considering various factors.
+
+        @return: True if the spread is available, False otherwise.
+        """
         df = self.df
         # print(df)
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
@@ -214,6 +362,13 @@ class TakerMakerFunctions(object):
             return self.quanto_profit_triggered or spread_cond
 
     def area_spread(self):
+        """
+        Determines if the area spread is above the threshold.
+
+        This function checks if the area spread is above the specified threshold for entry or exit.
+
+        @return: True if the area spread is above the threshold, False otherwise.
+        """
         if (self.side == 'entry') & (self.df.loc[self.timestamp, 'entry_area_spread'] >= self.area_spread_threshold):
             return True
         elif (self.side == 'exit') & (self.df.loc[self.timestamp, 'exit_area_spread'] >= self.area_spread_threshold):
@@ -222,6 +377,13 @@ class TakerMakerFunctions(object):
             return False
 
     def rate_limit(self):
+        """
+        Determines if the rate limit has been exceeded.
+
+        This function checks if the rate limit for posting orders has been exceeded based on the time difference.
+
+        @return: True if the rate limit is within bounds, False otherwise.
+        """
         counter = len(self.list_trying_post_counter)
         # if counter >= 10:
         #     print('a')
@@ -257,6 +419,13 @@ class TakerMakerFunctions(object):
 
     @property
     def try_post_condition(self):
+        """
+        Determines if the conditions for posting an order are met.
+
+        This function checks if the conditions for posting an order are met, considering spread and rate limits.
+
+        @return: True if the conditions are met, False otherwise.
+        """
         if not self.spread_available():
             return False
         if self.area_spread_threshold != 0:
@@ -271,6 +440,13 @@ class TakerMakerFunctions(object):
                 return False
 
     def update_time_latency_try_post(self, event):
+        """
+        Updates the timestamp with the latency for trying to post.
+
+        This function updates the timestamp and position with the latency for trying to post an order.
+
+        @param event: The event triggering the update.
+        """
         df = self.df
         self.position_current_timestamp = get_index_right(self.timestamps, self.position_current_timestamp,
                                                           self.latency_try_post) - 1
@@ -280,15 +456,13 @@ class TakerMakerFunctions(object):
 
     @property
     def try_to_post(self):
-        '''
-        Condition to exit the trying_to-post state
-        This conditions performs the following:
-        * Adds a latency to the values.
-        * Checks if in this time interval there is a price change in the swap prices
-        * returns the side of the execution that will be used later on
+        """
+        Determines if the conditions for trying to post an order are met.
 
-        Before this function is called, a signal needs to set the depth of the order
-        '''
+        This function checks if the conditions for trying to post an order are met, considering various factors.
+
+        @return: True if the conditions are met, False otherwise.
+        """
         df = self.df
         idx_last_spot, idx_last_swap = self.find_known_values_index()
         if self.predicted_depth is None:
@@ -350,13 +524,13 @@ class TakerMakerFunctions(object):
 
     @property
     def spread_unavailable_post(self):
-        '''
-        Define if the spread is unavailable or the swap price moves in the wrong direction.
-        Return True if spread is unavailable or swap price moved in wrong direction.
-        * in entry side wrong direction is previous value larger than current value
-        * in exit side wrong direction is previous value smaller than current value
-        The spread is calculated on the known values and not on the real values
-        '''
+        """
+        Determines if the spread is unavailable for posting.
+
+        This function checks if the spread is unavailable or if the swap price moves in the wrong direction.
+
+        @return: True if the spread is unavailable, False otherwise.
+        """
         # @TODO need to call the signal generating function first
 
         df = self.df
@@ -404,6 +578,13 @@ class TakerMakerFunctions(object):
                 return False
 
     def keep_time_post(self, event):
+        """
+        Keeps track of the posting time for an order.
+
+        This function updates the posting time and current timestamp during the 'posted' state.
+
+        @param event: The event triggering the time update.
+        """
         if event.transition.dest == 'posted':
             self.time_post = self.timestamp
         if self.timestamp < self.df.index[-1]:
@@ -411,6 +592,13 @@ class TakerMakerFunctions(object):
             self.timestamp = self.df.index[self.position_current_timestamp]
 
     def cancel_open_swap(self, event):
+        """
+        Cancels an open swap order.
+
+        This function removes an open swap order from the list of orders and updates its status.
+
+        @param event: The event triggering the cancellation.
+        """
         if len(self.limit_orders_swap) > 0:
             if self.verbose:
                 print(
@@ -424,18 +612,24 @@ class TakerMakerFunctions(object):
 
     @property
     def swap_price_no_movement(self):
-        '''
-        When there is no movement in the swap price this function will return True
-        In order to archive that we compare the current known value with the previous one
-        '''
+        """
+        Determines if there is no movement in the swap price.
+
+        This function checks if there is no movement in the swap price based on spread availability and movement.
+
+        @return: True if there is no movement, False otherwise.
+        """
         return not (self.spread_unavailable_post or self.swap_price_movement_correct)
 
     @property
     def swap_price_movement_correct(self):
-        '''
-        Condition to check if we have a movement of the known swap price towards the correct side
-        (price increase on entry and price decrease on exit)
-        '''
+        """
+        Determines if the swap price movement is in the correct direction.
+
+        This function checks if the swap price is moving in the correct direction based on the order side.
+
+        @return: True if the movement is correct, False otherwise.
+        """
         df = self.df
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
         idx_c = df.index.get_loc(idx_lat_swap)
@@ -477,9 +671,13 @@ class TakerMakerFunctions(object):
 
     @property
     def activation_function_cancel(self):
-        '''
-        We get cancelled when the price swap moves against us in the time interval between now and now+latency
-        '''
+        """
+        Determines if a cancellation should be activated.
+
+        This function checks if the conditions for cancellation are met based on swap price movement.
+
+        @return: True if cancellation should be activated, False otherwise.
+        """
         df = self.df
         a = self.position_current_timestamp  # df.index.searchsorted(self.timestamp)
         b = get_index_right(self.timestamps, self.position_current_timestamp,
@@ -533,23 +731,27 @@ class TakerMakerFunctions(object):
         else:
             return False
 
-    # function to compute the swap value that will be used for the computation of the spread
-
     def move_time_forward(self, event):
-        '''
-        move time forward from one transition to another when no latency is Included.
-        When condition is met compute also the quanto loss
-        '''
+        """
+        Moves the timestamp forward.
+
+        This function updates the timestamp and current position to move time forward during transitions.
+
+        @param event: The event triggering the time update.
+        """
         if self.timestamp < self.df.index[-1]:
             self.position_current_timestamp += 1
             self.timestamp = self.df.index[self.position_current_timestamp]
             # self.timestamp = self.df.index[self.df.index.searchsorted(self.timestamp) + 1]
 
     def swap_value(self, event):
-        '''
-        Find the swap price on the exit of the trying to post state in order to use it later in order to define the
-        executing spread.
-        '''
+        """
+        Computes the swap price value.
+
+        This function finds the swap price for the given side during the trying to post state.
+
+        @param event: The event triggering the computation.
+        """
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
         if self.side == 'entry':
             self.swap_price = self.df.loc[idx_lat_swap, 'price_swap_entry']
@@ -557,10 +759,25 @@ class TakerMakerFunctions(object):
             self.swap_price = self.df.loc[idx_lat_swap, 'price_swap_exit']
 
     def trying_to_post_counter(self, event):
+        """
+        Updates the counter for trying to post.
+
+        This function appends the current timestamp and side to the list of trying to post attempts.
+
+        @param event: The event triggering the update.
+        """
         self.list_trying_post_counter.append([self.timestamp, self.side])
 
-    # On entry and on exit functions of the states
     def posting_f(self, event):
+        """
+        Updates the timestamp during the posting state.
+
+        This function adjusts the timestamp and position during the posting state transition.
+
+        @param event: The event triggering the update.
+
+        @return: The updated timestamp.
+        """
         # print('currently posting')
         df = self.df
 
@@ -576,6 +793,15 @@ class TakerMakerFunctions(object):
         return self.timestamp
 
     def executing_f(self, event):
+        """
+        Updates the timestamp during the executing state.
+
+        This function adjusts the timestamp and position during the executing state transition.
+
+        @param event: The event triggering the update.
+
+        @return: The updated timestamp.
+        """
         # print('currently executing')
         df = self.df
 
@@ -599,9 +825,15 @@ class TakerMakerFunctions(object):
         return self.timestamp
 
     def cancelled_f(self, event):
-        '''
-        Add latency when entering the cancel state
-        '''
+        """
+        Updates the timestamp during the cancelled state.
+
+        This function adjusts the timestamp and position during the cancelled state transition.
+
+        @param event: The event triggering the update.
+
+        @return: The updated timestamp.
+        """
         df = self.df
         # print('currently cancelled')
         if self.timestamp + self.latency_cancel in df.index:
@@ -616,9 +848,15 @@ class TakerMakerFunctions(object):
         return self.timestamp
 
     def spot_balance_f(self, event):
-        '''
-        Add a spot_balance latency in order to enter the spot_balance state
-        '''
+        """
+        Updates the timestamp during the spot balance state.
+
+        This function adjusts the timestamp and position during the spot balance state transition.
+
+        @param event: The event triggering the update.
+
+        @return: The updated timestamp.
+        """
         df = self.df
         # print('currently spot balance')
         if self.timestamp + self.latency_spot_balance in df.index:
@@ -634,6 +872,13 @@ class TakerMakerFunctions(object):
         return self.timestamp
 
     def send_market_order_spot(self, event):
+        """
+        Sends a market order for the spot market.
+
+        This function executes a market order for the spot market, updating the taker execution details.
+
+        @param event: The event triggering the market order.
+        """
         df = self.df
         idx_last_spot, idx_last_swap = self.find_known_values_index()
         index_timestamp = df.index.get_loc(self.timestamp)
@@ -659,10 +904,13 @@ class TakerMakerFunctions(object):
             self.taker_execution_spot.timestamp_executed = df.index[index_timestamp]
 
     def compute_final_spread(self, event):
-        '''
-        Define the final spread:
-        The computation uses the Swap price stored in the trying_to_post state and the real value of the Spot price
-        '''
+        """
+        Computes the final spread for the trade.
+
+        This function calculates the final spread using the swap price stored during the trying to post state.
+
+        @param event: The event triggering the spread computation.
+        """
         df = self.df
 
         if self.side == 'entry':
@@ -673,10 +921,13 @@ class TakerMakerFunctions(object):
                                                 self.swap_fee, self.spot_fee)
 
     def volume_traded(self, event):
-        '''
-        function to compute the cumulative volume.
-        if side = entry we add the traded volume, if the side = exit we subtract the volume.
-        '''
+        """
+        Updates the cumulative volume traded.
+
+        This function computes the cumulative volume traded and updates the total volume based on the trade side.
+
+        @param event: The event triggering the volume update.
+        """
         self.traded_volume = self.compute_volume_size()
 
         if self.side == 'entry':
@@ -687,12 +938,13 @@ class TakerMakerFunctions(object):
         self.total_volume_traded = self.total_volume_traded + self.traded_volume
 
     def quanto_loss_w_avg(self, event):
-        '''
-        function to compute the average weighted price for Quanto profit-loss.
-        The average price is computed when cum_volume > 0  on the entry side,
-        and when cum_volume < 0  on the exit side
-        '''
+        """
+        Computes the average weighted price for Quanto profit-loss.
 
+        This function calculates the average weighted price for Quanto profit-loss based on the trade side and volume.
+
+        @param event: The event triggering the computation.
+        """
         if self.funding_system == 'Quanto_loss' or self.funding_system == 'Quanto_profit':
             self.quanto_loss_func(event)
             price_btc_t = self.price_btc.loc[self.btc_idx, 'price_ask']
@@ -716,11 +968,13 @@ class TakerMakerFunctions(object):
                      self.traded_volume * price_eth_t) / self.cum_volume)
 
     def quanto_loss_func(self, event):
-        '''
-        function to compute the quanto profit or quanto loss whenever conditions are met.
-        In order to reduce the computation we have set a condition: for the quanto profit to be computed the previous
-        computation must have happened some seconds in the past
-        '''
+        """
+        Computes the Quanto profit or loss.
+
+        This function calculates the Quanto profit or loss based on the conditions and updates relevant values.
+
+        @param event: The event triggering the computation.
+        """
         if self.timestamp - self.previous_timestamp >= 5000:
             self.btc_idx = self.price_btc.loc[self.btc_idx:, 'timestamp'].searchsorted(self.timestamp, side='left') + \
                            self.btc_idx
@@ -769,6 +1023,13 @@ class TakerMakerFunctions(object):
                                                                                                 self.idx])
 
     def update_order_after_executed(self, event):
+        """
+        Updates the order status after execution.
+
+        This function updates the status and attributes of an executed order in the swap limit orders.
+
+        @param event: The event triggering the update.
+        """
         df = self.df
         idx_last_spot, idx_last_swap = self.find_known_values_index()
         idx_current = df.index.get_loc(idx_last_swap)
@@ -787,6 +1048,13 @@ class TakerMakerFunctions(object):
                     f"Time: {self.df.Time.loc[self.timestamp]}\t Swap executed\t Order id {self.limit_orders_swap[0].id}\t Executed while cancelling")
 
     def update_executions(self, event):
+        """
+        Updates the execution details.
+
+        This function records the execution details in the list of executions, updating relevant attributes.
+
+        @param event: The event triggering the update.
+        """
         # We are assuming that when balancing we won't have two maker orders in our system
         # need to know if we were makers on both sides or not. In case we were takers need to know where we were takers
         df = self.df
@@ -796,7 +1064,7 @@ class TakerMakerFunctions(object):
         # print(f"Time: {self.df.Time.loc[self.timestamp]}\tCentral band: {self.df.loc[self.timestamp, 'Central Band']}\tPrice spot ask: {self.df.price_swap_ask.loc[self.timestamp]}\tPrice spot ask:{self.df.price_spot_exit.loc[self.timestamp]}\tPrice swap bid:{self.df.price_swap_bid.loc[self.timestamp]}\tPrice spot bid:{self.df.price_spot_entry.loc[self.timestamp]}")
 
         assert self.limit_orders_swap[0].timestamp_executed > self.limit_orders_swap[
-            0].timestamp_posted, f"Something is wrong. Found order executed before posted. Timestamp posted {self.limit_orders_swap[0].timestamp_posted}"
+             0].timestamp_posted, f"Something is wrong. Found order executed before posted. Timestamp posted {self.limit_orders_swap[0].timestamp_posted}"
         execution_swap = self.limit_orders_swap[0]
         targeted_spread = self.limit_orders_swap[0].targeted_spread
         if self.side == 'entry':
@@ -827,12 +1095,24 @@ class TakerMakerFunctions(object):
         return
 
     def quanto_trailing_func(self):
+        """
+        Updates the maximum Quanto profit.
+
+        This function adjusts the maximum Quanto profit based on the current loss and conditions.
+        """
         if self.quanto_loss > self.max_quanto_profit and self.quanto_loss >= self.disable_when_below:
             self.max_quanto_profit = self.quanto_loss
         elif self.quanto_loss < self.disable_when_below:
             self.max_quanto_profit = 0
 
     def trading_condition(self):
+        """
+        Determines if trading conditions are met.
+
+        This function checks if the trading conditions are satisfied based on instrument type and funding system.
+
+        @return: True if trading conditions are met, False otherwise.
+        """
         if self.swap_instrument == 'ETHUSD' and self.exchange_swap == 'BitMEX':
             if self.funding_system == 'No' or self.funding_system == 'Quanto_profit':
                 if (self.side == 'entry') & (self.cum_volume >= 0):
@@ -864,6 +1144,18 @@ class TakerMakerFunctions(object):
 
 
 def get_taker_trades(t0, t1, swapMarket, swapSymbol):
+    """
+    Retrieves taker trades from the specified swap market.
+
+    This function queries the specified swap market for taker trades within the given time range.
+
+    @param t0: The start time for the query.
+    @param t1: The end time for the query.
+    @param swapMarket: The swap market to query trades from.
+    @param swapSymbol: The symbol of the asset to query trades for.
+
+    @return: A DataFrame containing the retrieved taker trades.
+    """
     influx_connection = InfluxConnection.getInstance()
 
     if swapMarket == 'BitMEX' or swapMarket == 'Deribit' or swapMarket == 'FTX' or swapMarket == 'Binance':
@@ -897,6 +1189,43 @@ def get_data_for_trader(t_start, t_end, exchange_spot, spot_instrument, exchange
                         target_percentage_entry=None, entry_opportunity_source=None, exit_opportunity_source=None,
                         minimum_target=None, use_aggregated_opportunity_points=None, ending=None,
                         force_band_creation=False, move_bogdan_band='No'):
+    """
+    Retrieves and processes data for a trading strategy.
+
+    This function gathers and processes price and band data for the specified trading strategy and parameters.
+
+    @param t_start: The start time for data retrieval.
+    @param t_end: The end time for data retrieval.
+    @param exchange_spot: The spot exchange to retrieve data from.
+    @param spot_instrument: The spot instrument symbol.
+    @param exchange_swap: The swap exchange to retrieve data from.
+    @param swap_instrument: The swap instrument symbol.
+    @param swap_fee: The fee for the swap exchange.
+    @param spot_fee: The fee for the spot exchange.
+    @param strategy: The trading strategy to use.
+    @param area_spread_threshold: The threshold for area spread.
+    @param environment: The trading environment (e.g., production, staging).
+    @param band_type: The type of band to use (e.g., percentage_band, bogdan_bands).
+    @param window_size: The window size for band computation (optional).
+    @param exit_delta_spread: The delta spread for exiting trades (optional).
+    @param entry_delta_spread: The delta spread for entering trades (optional).
+    @param band_funding_system: The funding system for bands (optional).
+    @param funding_window: The funding window for band computation.
+    @param generate_percentage_bands: A boolean indicating whether to generate percentage bands.
+    @param lookback: The lookback period for band computation (optional).
+    @param recomputation_time: The recomputation time for bands (optional).
+    @param target_percentage_exit: The target percentage for exiting trades (optional).
+    @param target_percentage_entry: The target percentage for entering trades (optional).
+    @param entry_opportunity_source: The source of entry opportunities (optional).
+    @param exit_opportunity_source: The source of exit opportunities (optional).
+    @param minimum_target: The minimum target for trades (optional).
+    @param use_aggregated_opportunity_points: A boolean indicating whether to use aggregated opportunity points.
+    @param ending: The ending condition for band generation (optional).
+    @param force_band_creation: A boolean indicating whether to force band creation.
+    @param move_bogdan_band: The condition for moving Bogdan bands (optional).
+
+    @return: A tuple containing the processed DataFrame and the strategy name.
+    """
     price1 = get_price(t_start=t_start, t_end=t_end, exchange=exchange_spot, symbol=spot_instrument, side='Ask',
                        environment=environment)
 
@@ -1071,6 +1400,15 @@ def get_data_for_trader(t_start, t_end, exchange_spot, spot_instrument, exchange
 
 @numba.jit(nopython=True)
 def df_numba(df_mat):
+    """
+    Performs calculations on the input matrix using Numba.
+
+    This function calculates the entry and exit area spread based on the provided matrix.
+
+    @param df_mat: The input matrix containing spread and band values.
+
+    @return: The modified matrix with updated area spread values.
+    """
     for idx in range(1, len(df_mat) - 1):
         if df_mat[idx, 0] >= df_mat[idx, 2]:
             df_mat[idx, 5] = df_mat[idx - 1, 5] + abs(df_mat[idx, 0] - df_mat[idx, 2]) * df_mat[idx, 4]
@@ -1082,6 +1420,17 @@ def df_numba(df_mat):
 
 @numba.jit(nopython=True)
 def get_index_left(timestamps, current_index, latency):
+    """
+    Finds the index of the timestamp to the left within the specified latency.
+
+    This function searches for the index of the timestamp to the left within the given latency.
+
+    @param timestamps: The list of timestamps.
+    @param current_index: The current index.
+    @param latency: The latency to consider.
+
+    @return: The index of the timestamp to the left.
+    """
     for j in range(current_index, -1, -1):
         if timestamps[j] < timestamps[current_index] - latency:
             return j
@@ -1089,6 +1438,17 @@ def get_index_left(timestamps, current_index, latency):
 
 @numba.jit(nopython=True)
 def get_index_right(timestamps, current_index, latency):
+    """
+    Finds the index of the timestamp to the right within the specified latency.
+
+    This function searches for the index of the timestamp to the right within the given latency.
+
+    @param timestamps: The list of timestamps.
+    @param current_index: The current index.
+    @param latency: The latency to consider.
+
+    @return: The index of the timestamp to the right, or -1 if not found.
+    """
     done = True
     for j in range(current_index, len(timestamps)):
         if timestamps[j] > timestamps[current_index] + latency:

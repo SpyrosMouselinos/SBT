@@ -32,71 +32,6 @@ t.tic()
 
 
 class TraderExpectedExecutions(object):
-    """
-    Variables used in the simulator:
-    source = the source of the transition in the state machine
-    final_spread =  the spread after the spot balance state
-    df = dataframe with all the input values, Entry Exit Band Values, Area Spread, ...
-    timestamp = the time in millis also the index of df
-    stop_timestamp =  the timestamp when the stop trading is enabled in the Quanto loss stop_trading mode
-    side = the side of the execution, entry or exit
-    position_current_timestamp =  the position of the timestamp in df
-    spot_fee = fee in the spot market
-    swap_fee = swap_fee
-    area_spread_threshold = area_spread_threshold
-    area_spread_value = the area spread parameter used in trading
-    latency_spot = latency to spot market
-    latency_swap = latency to swap market
-    latency_try_post = latency while trying to post in the swap market
-    latency_cancel = latency while trying to cancel in the swap market
-    latency_spot_balance = latency while we spot_balance in spot market
-    environment = environment of the data, staging or production
-
-    exchange_swap = exchange_swap
-    swap_instrument = swap instrument, ticker of the coin
-    spot_instrument = spot instrument, ticker of the coin
-
-    max_position = max position of our trade in USD
-    max_trade_volume = max trade volume of a single trade in USD
-
-    funding_system = when Quanto contract the side of the trade, values: Quanto_loss, Quanto_profit, No
-
-    stop_trading_enabled = boolean variable to initiate the procedure for stopping the trading in Quanto_loss
-    halt_trading_flag = boolean variable to flag the stop trading timestamp in Quanto_loss
-
-    ratio_entry_band_mov = ratio of the band movement additional to the allowed movement in Quanto_profit and
-    Quanto_loss
-
-    ratio_entry_band_mov_ind = ratio of the band movement additional to the allowed movement in Quanto_profit, this
-    variable allows the entry band to move independent of the exit band whenever the exit is not close to entry
-
-    ratio_exit_band_mov = ratio of the band movement in the exit band in Quanto_profit new band movement process
-
-    rolling_time_window_size =  the window size we want to go into the past in order to compute the theoritical quanto
-    profit or loss which moves the exit band in Quanto_profit new movement system or entry in Quanto_loss system
-
-    move_exit_above_entry = boolean variable to define whether the exit band is allowed to move above the entry in
-    Quanto_profit system
-
-    funding_options = type:string defines the funding option we want to use for the combinations added especially for
-    BitMEX/Deribit BTC
-
-    exponent1 = the exponent used in the computation of quanto_profit
-    exponent2 = the exponent used in the computation of quanto_profit
-
-    current_r = the ratio of the band movement in Quanto_loss when we want top switch ratios in different volatility
-    periods, this value overides the ratio_entry_band_mov parameter
-    high_r =  the ratio of the band movement in Quanto_loss when we want to switch ratios in different volatility
-    periods, this value overides the ratio_entry_band_mov parameter
-    quanto_threshold = the maximum quanto loss allowed in Quanto_loss, also the trigger to change from current_r to high_r
-    high_to_current = boolean, if enabled switches back from high_r to current_r
-
-    minimum_distance = the minimum distance allowed between entry and exit band in Quanto_loss, Quanto_profit
-
-    price_btc = the ask price of btc from BitMEX
-    price_eth = the ask price pf eth from BitMEX
-
-    """
     # Define the states of the trading:
     states = [{'name': 'clear', 'on_enter': ['band_funding_adjustment']},
               {'name': 'trying_to_post',
@@ -150,6 +85,70 @@ class TraderExpectedExecutions(object):
                  funding_ratios_params_swap=None,
                  moving_average: int = None,
                  prediction_emitter=None):
+        """
+        Initializes the TraderExpectedExecutions class with all required parameters for simulation.
+
+        @param df: DataFrame with input values like Entry/Exit Band Values and Area Spread.
+        @param spot_fee: Fee for trading on the spot market.
+        @param swap_fee: Fee for trading on the swap market.
+        @param area_spread_threshold: Threshold for area spread used in trading.
+        @param latency_spot: Latency for spot market orders.
+        @param latency_swap: Latency for swap market orders.
+        @param latency_try_post: Latency while trying to post in the swap market.
+        @param latency_cancel: Latency while attempting to cancel orders in the swap market.
+        @param latency_spot_balance: Latency for balancing on the spot market.
+        @param max_position: Maximum allowed position size in USD.
+        @param max_trade_volume: Maximum volume for a single trade in USD.
+        @param environment: Trading environment, either staging or production.
+        @param exchange_swap: Exchange for swap trading.
+        @param exchange_spot: Exchange for spot trading.
+        @param swap_instrument: Instrument (ticker) for swap trading.
+        @param spot_instrument: Instrument (ticker) for spot trading.
+        @param funding_system: The funding system in use, such as Quanto_loss, Quanto_profit, etc.
+        @param minimum_distance: Minimum distance between entry and exit bands.
+        @param minimum_value: Minimum value for trading.
+        @param trailing_value: Trailing value for adjustments.
+        @param disable_when_below: Disables trading when below this value.
+        @param ratio_entry_band_mov: Ratio of entry band movement in Quanto systems.
+        @param ratio_entry_band_mov_ind: Independent ratio of entry band movement.
+        @param stop_trading: Boolean flag to stop trading under certain conditions.
+        @param current_r: Current ratio for band movement in volatile periods.
+        @param high_r: High ratio for band movement in volatile periods.
+        @param quanto_threshold: Maximum allowed quanto loss before switching ratios.
+        @param high_to_current: Switch back from high_r to current_r if enabled.
+        @param ratio_exit_band_mov: Ratio of exit band movement.
+        @param rolling_time_window_size: Rolling time window size for computing quanto profit/loss.
+        @param hours_to_stop: Hours to stop trading after a stop trigger.
+        @param move_exit_above_entry: Allows exit band to move above entry band if true.
+        @param ratio_entry_band_mov_long: Entry band movement ratio for long positions.
+        @param rolling_time_window_size_long: Rolling time window size for long positions.
+        @param ratio_exit_band_mov_ind_long: Independent exit band movement ratio for long positions.
+        @param exponent1: Exponent used in computing quanto profit.
+        @param exponent2: Exponent used in computing quanto profit.
+        @param exponent3: Exponent used in computing quanto profit.
+        @param rolling_time_window_size2: Second rolling time window size for exponential computations.
+        @param entry_upper_cap: Upper cap for entry values.
+        @param entry_lower_cap: Lower cap for entry values.
+        @param exit_upper_cap: Upper cap for exit values.
+        @param w_theoretical_qp_entry: Weight for theoretical quanto profit entry.
+        @param w_real_qp_entry: Weight for real quanto profit entry.
+        @param use_local_min_max: Enable local minimum and maximum calculations if true.
+        @param num_of_points_to_lookback_entry: Number of points to look back for entry.
+        @param num_of_points_to_lookback_exit: Number of points to look back for exit.
+        @param depth_posting_predictor: Predictor for depth posting.
+        @param swap_market_tick_size: Tick size for swap market.
+        @param price_box_params: Parameters for price box computations.
+        @param net_trading: Net trading condition.
+        @param use_bp: Enable basis points calculation if true.
+        @param funding_system_name: Name of the funding system in use.
+        @param funding_window: Funding window size.
+        @param slow_funding_window: Slow funding window size.
+        @param funding_options: Options for funding strategies.
+        @param funding_ratios_params_spot: Parameters for spot funding ratios.
+        @param funding_ratios_params_swap: Parameters for swap funding ratios.
+        @param moving_average: Moving average size for computations.
+        @param prediction_emitter: Emitter for prediction signals.
+        """
         self.source = None
         self.final_spread = 0
         self.df = df
@@ -589,15 +588,22 @@ class TraderExpectedExecutions(object):
                                         after=['compute_final_spread', 'volume_traded'])
 
     def compute_volume_size(self):
+        """
+        @brief Computes the size of the trade volume based on the maximum allowed trade volume.
+
+        @return: The traded volume as a float.
+        """
         traded_volume = self.max_trade_volume
         return traded_volume
 
     def find_known_values_index(self):
-        '''
-        Find the index (timestamp) of the known spot and swap prices.
-        Known values: values we know at any time moment and include a latency concern the time we receive the
-        information of a new price.
-        '''
+        """
+        @brief Finds the indices of known spot and swap prices considering latency.
+        This method accounts for the time delay in receiving price data
+        and adjusts the indices for spot and swap prices accordingly.
+
+        @return: Tuple (idx_lat_spot, idx_lat_swap) representing the indices of known spot and swap prices.
+        """
 
         df = self.df
         if self.timestamp - self.latency_spot >= df.index[0]:
@@ -620,6 +626,11 @@ class TraderExpectedExecutions(object):
 
     @property
     def has_prices(self):
+        """
+        @brief Checks if known spot and swap prices are available.
+
+        @return: Boolean indicating whether both spot and swap prices are available.
+        """
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
         temp_ix_swap = self.df.index.get_loc(idx_lat_swap)
         temp_ix_spot = self.df.index.get_loc(idx_lat_spot)
@@ -634,6 +645,14 @@ class TraderExpectedExecutions(object):
         return not self.has_prices
 
     def entry_band_fn(self, event, cum_volume):
+        """
+        @brief Computes the entry band value based on the current cumulative volume and funding adjustments.
+
+        @param event: The event triggering the computation.
+        @param cum_volume: Current cumulative trading volume.
+
+        @return: Calculated entry band value as a float.
+        """
         if self.funding_options is not None and cum_volume < 0:
             try:
                 funding_adjustment = self.entry_funding_adjustment_to_zero
@@ -658,6 +677,14 @@ class TraderExpectedExecutions(object):
             funding_adjustment
 
     def exit_band_fn(self, event, cum_volume):
+        """
+        @brief Computes the exit band value based on the current cumulative volume and funding adjustments.
+
+        @param event: The event triggering the computation.
+        @param cum_volume: Current cumulative trading volume.
+
+        @return: Calculated exit band value as a float.
+        """
         if self.funding_options is not None and cum_volume > 0:
             try:
                 funding_adjustment = self.exit_funding_adjustment_to_zero
@@ -682,10 +709,13 @@ class TraderExpectedExecutions(object):
 
     def local_min_max(self):
         """
-        function to compute if local minimum (or maximum) is above entry band (or below exit band)
-        this function is activated if the use_local_min_max is TRUE
-        """
+        @brief Computes local minimum and maximum conditions for entry and exit bands.
 
+        This method determines if the local minimum (for entry) or maximum (for exit)
+        is above or below the respective bands when enabled.
+
+        @return: Boolean indicating if local minimum or maximum conditions are met.
+        """
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
         temp_ix_swap = self.df.index.get_loc(idx_lat_swap)
         temp_ix_spot = self.df.index.get_loc(idx_lat_spot)
@@ -754,10 +784,10 @@ class TraderExpectedExecutions(object):
         return local_min_max_cond
 
     def spread_available(self):
-        '''
-        Find the spread of the known values
-        '''
-
+        """
+        @brief Checks if the trading spread is available based on known values and conditions.
+        @return: Boolean indicating if the trading spread conditions are met.
+        """
         df = self.df
         # print(df)
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
@@ -827,6 +857,13 @@ class TraderExpectedExecutions(object):
             return False
 
     def rate_limit(self):
+        """
+        @brief Determines if the trading rate limit is exceeded.
+
+        This method checks if the number of posting attempts within a time window exceeds allowed limits.
+
+        @return: Boolean indicating if trading is within rate limits.
+        """
         if len(self.list_trying_post_counter) < 1:
             return True
         self.list_trying_post_counter = pop_old(self.list_trying_post_counter, self.timestamp, 1000 * 60)
@@ -841,6 +878,15 @@ class TraderExpectedExecutions(object):
 
     @functools.lru_cache(maxsize=2)
     def inner_try_post_condition(self, timestamp):
+        """
+        @brief Internal method to evaluate posting conditions based on the timestamp.
+
+        This method assesses multiple conditions like spread, trading halts, and rate limits.
+
+        @param timestamp: The current timestamp being evaluated.
+
+        @return: Boolean indicating if conditions to attempt posting are satisfied.
+        """
         if self.use_local_min_max:
             if not self.local_min_max():
                 return False
@@ -869,6 +915,13 @@ class TraderExpectedExecutions(object):
         return self.helper_conditions_to_post()
 
     def helper_conditions_to_post(self):
+        """
+        @brief Evaluates supplementary conditions for posting trades.
+
+        This method checks area spread, rate limits, and trading conditions to determine posting eligibility.
+
+        @return: Boolean indicating if supplementary conditions are met.
+        """
         if self.area_spread_threshold != 0:
             if (self.area_spread() == True) & (self.rate_limit() == True) & (self.trading_condition() == True):
                 return True
@@ -883,13 +936,15 @@ class TraderExpectedExecutions(object):
     @property
     def try_post_condition(self):
         """
-        conditions used in the transition clear -> clear and clear -> try_to_post
+        @brief Main condition to determine if trading should move to the trying_to_post state.
+        Logic: Conditions used in the transition clear -> clear and clear -> try_to_post
         This condition checks:
         - if the spread is available
         - If the stop trading is enabled in Quanto_loss and stops the trading for 8 hours
         - If we are rate limited
         - If the cumulative volume is above the max position allowed
         - If the area spread condition  is met.
+        @return: Boolean indicating if the trying_to_post transition is valid.
         """
         start = time.time_ns()
         temp = self.inner_try_post_condition(self.timestamp)
@@ -897,6 +952,11 @@ class TraderExpectedExecutions(object):
         return temp
 
     def update_time_latency_try_post(self, event):
+        """
+        @brief Updates the timestamp and position considering latency when attempting to post.
+
+        @param event: The event triggering the update.
+        """
         df = self.df
         self.position_current_timestamp = get_index_right(self.timestamps, self.position_current_timestamp,
                                                           self.latency_try_post) - 1
@@ -904,13 +964,14 @@ class TraderExpectedExecutions(object):
 
     @property
     def activation_function_try_post(self):
-        '''
-        Condition to exit the trying_to-post state
+        """
+        @brief Condition to exit the trying_to-post state
         This conditions performs the following:
         * Adds a latency to the values.
         * Checks if in this time interval there is a price change in the swap prices
         * returns the side of the execution that will be used later on
-        '''
+        @return: Boolean indicating if the conditions to exit trying_to_post are met.
+        """
         start = time.time_ns()
         df = self.df
         a = self.position_current_timestamp
@@ -945,6 +1006,15 @@ class TraderExpectedExecutions(object):
 
     @functools.lru_cache(maxsize=2)
     def inner_spread(self, timestamp):
+        """
+        @brief Computes spreads and evaluates conditions for spread availability during posting.
+
+        Uses cached results for efficiency.
+
+        @param timestamp: Current timestamp for evaluation.
+
+        @return: Boolean indicating if spreads and conditions for posting are satisfied.
+        """
         df = self.df
         # print(df)
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
@@ -1001,13 +1071,13 @@ class TraderExpectedExecutions(object):
 
     @property
     def spread_unavailable_post(self):
-        '''
-        Define if the spread is unavailable or the swap price moves in the wrong direction.
-        Return True if spread is unavailable or swap price moved in wrong direction.
-        * in entry side wrong direction is previous value larger than current value
-        * in exit side wrong direction is previous value smaller than current value
+        """
+        @brief Define if the spread is unavailable or the swap price moves in the wrong direction.
+        * In entry side wrong direction is previous value larger than current value
+        * In exit side wrong direction is previous value smaller than current value
         The spread is calculated on the known values and not on the real values
-        '''
+        @return: Boolean Return True if spread is unavailable or swap price moved in wrong direction.
+        """
         start = time.time_ns()
         temp = self.inner_spread(self.timestamp)
         self.time_spent_spread_unavailable += time.time_ns() - start
@@ -1015,6 +1085,15 @@ class TraderExpectedExecutions(object):
 
     @functools.lru_cache(maxsize=2)
     def inner_too_deep(self, timestamp):
+        """
+        @brief Determines if the order is placed too deep in the order book based on the current depth and price.
+
+        Uses cached results for efficiency.
+
+        @param timestamp: Current timestamp for evaluation.
+
+        @return: Boolean indicating if the order is placed too deep in the order book.
+        """
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
 
         temp_ix_swap = self.df.index.get_loc(idx_lat_swap)
@@ -1036,12 +1115,22 @@ class TraderExpectedExecutions(object):
 
     @property
     def is_order_too_deep(self):
+        """
+        @brief Evaluates if the order is too deep in the order book based on market conditions.
+
+        @return: Boolean indicating if the order is too deep.
+        """
         start = time.time_ns()
         temp = self.inner_too_deep(self.timestamp)
         self.time_order_too_deep += time.time_ns() - start
         return temp
 
     def keep_time_post(self, event):
+        """
+        @brief Updates the timestamp to reflect the time when the order was posted.
+
+        @param event: The event triggering the update.
+        """
         if event.transition.dest == 'posted':
             self.time_post = self.timestamp
         if self.timestamp < self.df.index[-1]:
@@ -1050,14 +1139,26 @@ class TraderExpectedExecutions(object):
 
     @property
     def swap_price_no_movement(self):
-        '''
+        """
+        @brief Checks if there has been no movement in the swap price.
         When there is no movement in the swap price this function will return True
         In order to archive that we compare the current known value with the previous one
-        '''
+        This is determined by comparing the current known swap price with the previous one.
+        @return: Boolean indicating if there is no movement in the swap price.
+        """
         return not (self.spread_unavailable_post or self.swap_price_movement_correct)
 
     @functools.lru_cache(maxsize=2)
     def inner_price_movement(self, timestamp):
+        """
+        @brief Evaluates if there is a correct movement in the swap price based on current market conditions.
+
+        Uses cached results for efficiency.
+
+        @param timestamp: Current timestamp for evaluation.
+
+        @return: Boolean indicating if swap price movement is correct.
+        """
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
         idx_c = self.df.index.get_loc(idx_lat_swap)
         if self.time_post == 0:
@@ -1091,16 +1192,29 @@ class TraderExpectedExecutions(object):
 
     @property
     def swap_price_movement_correct(self):
-        '''
-        Condition to check if we have a movement of the known swap price towards the correct side
-        (price increase on entry and price decrease on exit)
-        '''
+        """
+        @brief Determines if the swap price movement is correct towards the desired trading direction.
+
+        Correct movement is defined as an increase in price for entry or a decrease for exit.
+
+        @return: Boolean indicating if swap price movement is correct.
+        """
         start = time.time_ns()
         temp = self.inner_price_movement(self.timestamp)
         self.time_time_movement_correct += time.time_ns() - start
         return temp
 
     def get_taker_trades(self, from_ts, to_ts):
+        """
+        @brief Retrieves taker trades between specified timestamps for the current swap instrument.
+
+        This method loads trade data from a specified period and filters out any invalid trades.
+
+        @param from_ts: Start timestamp for trade retrieval.
+        @param to_ts: End timestamp for trade retrieval.
+
+        @return: DataFrame containing taker trades between the specified timestamps.
+        """
         if self.taker_volume_df is None or to_ts > self.taker_volume_df.iloc[-1]['timems']:
             load_from = from_ts - 1000 * 60 * 15
             load_to = to_ts + 1000 * 60 * 60 * 25
@@ -1122,9 +1236,15 @@ class TraderExpectedExecutions(object):
 
     @functools.lru_cache(maxsize=2)
     def inner_activation_function_cancel(self, timestamp):
-        '''
+        """
+        @brief Evaluates if a cancellation of the current order is required due to adverse price movements.
         We get cancelled when the price swap moves against us in the time interval between now and now+latency
-        '''
+        Uses cached results for efficiency.
+
+        @param timestamp: Current timestamp for evaluation.
+
+        @return: Boolean indicating if order cancellation is necessary.
+        """
         start = time.time_ns()
         df = self.df
         a = self.position_current_timestamp
@@ -1175,25 +1295,32 @@ class TraderExpectedExecutions(object):
 
     @property
     def activation_function_cancel(self):
+        """
+        @brief Evaluates if the order cancellation condition is met based on adverse market movements.
+
+        @return: Boolean indicating if order cancellation should occur.
+        """
         start = time.time_ns()
         temp = self.inner_activation_function_cancel(self.timestamp)
         self.time_activation_function_cancel += time.time_ns() - start
         return temp
 
     def move_time_forward(self, event):
-        '''
-        move time forward from one transition to another when no latency is Included.
-        When condition is met compute also the quanto loss
-        '''
+        """
+         @brief Move time forward from one transition to another when no latency is Included. 
+         When condition is met compute also the quanto loss.
+         @param event Event that triggered this
+        """
+        # Move the current timestamp to the current timestamp.
         if self.timestamp < self.df.index[-1]:
             self.position_current_timestamp += 1
             self.timestamp = self.df.index[self.position_current_timestamp]
 
     def swap_value(self, event):
-        '''
-        Find the swap price on the exit of the trying to post state in order to use it later in order to define the
+        """
+        @brief Find the swap price on the exit of the trying to post state in order to use it later in order to define the
         executing spread.
-        '''
+        """
         idx_lat_spot, idx_lat_swap = self.find_known_values_index()
         temp_ix_swap = self.df.index.get_loc(idx_lat_swap)
         # temp_ix_spot = self.df.index.get_loc(idx_lat_spot)
@@ -1219,9 +1346,15 @@ class TraderExpectedExecutions(object):
 
     # On entry and on exit functions of the states
     def posting_f(self, event):
+        """
+         @brief This function is called when the posting is finished. It checks if the timestamp is in the index and if it is it moves the timestamp to the right of the timestamp that has been posted
+         @param event the event that was posted
+         @return the timestamp of the posting
+        """
         # print('currently posting')
         df = self.df
 
+        # This method is used to calculate the timestamp of the current timestamp and position of the index.
         if self.timestamp + self.latency_try_post in df.index:
             self.timestamp = self.timestamp + self.latency_try_post
             self.position_current_timestamp = df.index.get_loc(self.timestamp)
@@ -1234,14 +1367,21 @@ class TraderExpectedExecutions(object):
         return self.timestamp
 
     def executing_f(self, event):
+        """
+         @brief Called when a transition is executing. This is the function that is called when a transition is executing.
+         @param event The event that triggered this function call. It is a transition in the form of an : class : ` Event `
+         @return The timestamp of the event
+        """
         # print('currently executing')
         df = self.df
 
+        # Try cancel if the event is try_cancel
         if event.transition.source == 'try_cancel':
             latency = self.latency_cancel
         else:
             latency = 0
 
+        # This method is used to calculate the timestamp and position of the current timestamp.
         if self.timestamp + latency in df.index:
             self.timestamp = self.timestamp + latency
             self.position_current_timestamp = df.index.get_loc(self.timestamp)
@@ -1256,10 +1396,13 @@ class TraderExpectedExecutions(object):
         return self.timestamp
 
     def cancelled_f(self, event):
-        '''
-        Add latency when entering the cancel state
-        '''
+        """
+         @brief This is the function called when cancelling. It adds latency when entering the cancel state
+         @param event the event that was pressed
+         @return the timestamp of the event that was pressing the
+        """
         df = self.df
+        # This method is used to calculate the timestamp of the current timestamp and position of the current timestamp.
         if self.timestamp + self.latency_cancel in df.index:
             self.timestamp = self.timestamp + self.latency_cancel
             self.position_current_timestamp = df.index.get_loc(self.timestamp)
@@ -1271,11 +1414,14 @@ class TraderExpectedExecutions(object):
         return self.timestamp
 
     def spot_balance_f(self, event):
-        '''
-        Add a spot_balance latency in order to enter the spot_balance state
-        '''
+        """
+         @brief Add a spot_balance latency in order to enter the spot_balance state
+         @param event Event that triggered this function call. Not used
+         @return timestamp of the event
+        """
         df = self.df
         # print('currently spot balance')
+        # This method is used to calculate the position current timestamp and position of the current timestamp.
         if self.timestamp + self.latency_spot_balance in df.index:
             self.timestamp = self.timestamp + self.latency_spot_balance
             self.position_current_timestamp = df.index.get_loc(self.timestamp)
@@ -1288,16 +1434,18 @@ class TraderExpectedExecutions(object):
         return self.timestamp
 
     def compute_final_spread(self, event):
-        '''
-        Define the final spread:
-        The computation uses the Swap price stored in the trying_to_post state and the real value of the Spot price
-        '''
+        """
+         @brief Compute the spreads fuction to use for the final spread. It is based on the swap price stored in the trying_to_post state and the spot price
+         @param event Event that triggered the
+        """
         df = self.df
 
+        # numba_numba self. side entry spread_entry spread_entry spread_exit spread_entry_func_numba self. swap_fee self. spot_fee self. use_bp
         if self.side == 'entry':
             self.final_spread = spread_entry_func_numba(self.swap_price, df.loc[self.timestamp, 'price_spot_entry'],
                                                         self.swap_fee, self.spot_fee)
             self.final_spread_bp = None
+            # if use_bp is True then the spread_entry_func_bp_numba function will use the spread_entry_func_bp_numba function to calculate the spread_entry_func_bp_numba function.
             if self.use_bp:
                 self.final_spread_bp = spread_entry_func_bp_numba(self.swap_price,
                                                                   df.loc[self.timestamp, 'price_spot_entry'],
@@ -1307,18 +1455,21 @@ class TraderExpectedExecutions(object):
             self.final_spread = spread_exit_func_numba(self.swap_price, df.loc[self.timestamp, 'price_spot_exit'],
                                                        self.swap_fee, self.spot_fee)
             self.final_spread_bp = None
+            # if use_bp is True then the spread exit func is used to calculate the spread exit func for the swap price and spot exit.
             if self.use_bp:
                 self.final_spread_bp = spread_exit_func_bp_numba(self.swap_price,
                                                                  df.loc[self.timestamp, 'price_spot_exit'],
                                                                  swap_fee=self.swap_fee, spot_fee=self.spot_fee)
 
     def volume_traded(self, event):
-        '''
-        function to compute the cumulative volume.
-        if side = entry we add the traded volume, if the side = exit we subtract the volume.
-        '''
+        """
+         @brief Callback for volume traded. 
+         If side = entry we add the traded volume, if the side = exit we subtract the volume.
+         @param event The event that triggered
+        """
         self.traded_volume = self.compute_volume_size()
 
+        # Entry or exit volume for the current volume
         if self.side == 'entry':
             self.cum_volume = self.cum_volume + self.traded_volume
         elif self.side == 'exit':
@@ -1327,17 +1478,24 @@ class TraderExpectedExecutions(object):
         self.total_volume_traded = self.total_volume_traded + self.traded_volume
 
     def quanto_loss_w_avg(self, event):
-        '''
-        function to compute the average weighted price for Quanto profit-loss.
+        """
+         @brief Event handler for Quanto profit - loss. Function to compute the average weighted price for Quanto profit-loss.
         The average price is computed when cum_volume > 0  on the entry side,
         and when cum_volume < 0  on the exit side
-        '''
-
+         @param event Event that triggered this
+        """
         self.quanto_system.update_trade(self.timestamp, self.cum_volume, self.side, self.traded_volume)
 
     def band_funding_adjustment(self, event):
+        """
+         @brief Adjust the Funding Band. This is called every time we are going to enter or exit a band
+         @param event Event that triggered this method
+         @return None Side Effects : self. df_array is
+        """
+        # if the funding system name is empty returns the funding system name
         if self.funding_system_name == '':
             return
+        # Update the funding system with the current timestamp.
         if self.timestamp > self.temp_funding_system.timestamp_last_update + self.temp_funding_system.update_interval:
             self.temp_funding_system.update(self.timestamp)
             self.entry_funding_adjustment, self.exit_funding_adjustment = self.temp_funding_system.band_adjustments()
@@ -1350,6 +1508,7 @@ class TraderExpectedExecutions(object):
         self.df_array[self.idx_previous_band_adjustment: self.idx,
         self.columns_to_positions['Entry Band with Funding adjustment']] = self.entry_band_fn(event=None,
                                                                                               cum_volume=self.cum_volume)
+        # Exit Band Exit to Zero
         if "Exit Band Exit to Zero" in list(self.df.columns):
             self.df_array[self.idx_previous_band_adjustment: self.idx,
             self.columns_to_positions['Exit Band Exit to Zero']] = self.exit_band_fn(event=None, cum_volume=1)
@@ -1359,11 +1518,13 @@ class TraderExpectedExecutions(object):
         self.idx_previous_band_adjustment = self.idx
 
     def quanto_loss_func(self, event):
-        '''
-        function to compute the quanto profit or quanto loss whenever conditions are met.
+        """
+         @brief Function to compute the quanto profit or quanto loss when conditions are met.
         In order to reduce the computation we have set a condition: for the quanto profit to be computed the previous
         computation must have happened some seconds in the past
-        '''
+         @param event Event that triggered the
+        """
+        # Update the quanto system and update the quanto system.
         if self.timestamp - self.previous_timestamp >= 5000 or (event.transition.source == 'spot_balance'):
             self.quanto_system.update(self.timestamp, self.cum_volume)
             self.quanto_system.update_exponential_quanto(self.exp1)
@@ -1384,8 +1545,11 @@ class TraderExpectedExecutions(object):
         self.df_array[self.idx, self.columns_to_positions['Entry Band with Quanto loss']] = self.entry_band_fn(
             event=None, cum_volume=self.cum_volume)
 
+        # This method is called by the game loop to stop the trading.
         if self.stop_trading and self.funding_system in ['Quanto_both', 'Quanto_both_extended', 'Quanto_loss']:
+            # This method will be called when the quanto_loss is less than the threshold
             if self.stop_trading and self.quanto_loss < - self.quanto_threshold:
+                # If the current value is high to current set to true
                 if self.high_to_current:
                     self.revert = True
                 self.quanto_system.ratio_entry_band_mov = self.quanto_system.high_r
@@ -1393,6 +1557,7 @@ class TraderExpectedExecutions(object):
                 self.counter += 1
 
             # reset bands after stopping the trading
+            # Stop the recording if the stop trading is enabled.
             if self.stop_trading_enabled and self.cum_volume <= 0 and (not self.allow_only_exit):
                 self.stop_timestamp = self.timestamp
                 self.allow_only_exit = True

@@ -17,29 +17,54 @@ load_dotenv(find_dotenv())
 
 
 def correlation_values_backfill(t_start, t_end):
+    """
+    Computes and backfills correlation values between Deribit ETH-PERPETUAL and BitMEX XBTUSD prices 
+    for different rolling windows.
+
+    This function retrieves ask prices from the specified exchanges and computes the correlation 
+    between them over rolling windows of different sizes (2h, 4h, and 8h). The results are written 
+    to an InfluxDB instance for further analysis.
+
+    Parameters:
+    ----------
+    t_start : int
+        The start timestamp in milliseconds for fetching price data.
+    t_end : int
+        The end timestamp in milliseconds for fetching price data.
+
+    Example:
+    -------
+    >>> correlation_values_backfill(1622548800000, 1622635200000)
+    """
+
+    # Get the InfluxDB connection instance
     connection = InfluxConnection.getInstance()
 
+    # Fetch ask prices for ETH-PERPETUAL from Deribit and XBTUSD from BitMEX
     price1 = get_price(t_start=t_start, t_end=t_end, exchange='Deribit', symbol='ETH-PERPETUAL', side='Ask',
                        environment='production')
     price2 = get_price(t_start=t_start, t_end=t_end, exchange='BitMEX', symbol='XBTUSD', side='Ask',
                        environment='production')
 
+    # Add 'Time' column from index
     price1['Time'] = price1.index
-
     price2['Time'] = price2.index
 
-    # merge the price dataframes
+    # Merge the price dataframes on 'Time'
     price_ask = pd.merge_ordered(price1, price2, on='Time', suffixes=['_ETH', '_BTC'])
 
+    # Re-index and resample data to 10-second intervals
     price_ask.index = price_ask.Time
     price_ask.drop(columns=['Time'], inplace=True)
     price_ask = price_ask.resample('10s').mean()
 
+    # Calculate rolling correlations for specified window sizes
     price_corr = {}
     for ws in ['2h', '4h', '8h']:
         price_corr[f'{ws}'] = price_ask.rolling(ws).corr().iloc[:, 0]
         price_corr[f'{ws}'].reindex(level=0, copy=True)
 
+    # Merge correlation data into a single DataFrame
     price_corr_df = pd.merge(price_corr['2h'], price_corr['4h'], left_index=True, right_index=True)
     price_corr_df = pd.merge(price_corr_df, price_corr['8h'], left_index=True, right_index=True)
     price_corr_df = price_corr_df.unstack()
@@ -47,12 +72,15 @@ def correlation_values_backfill(t_start, t_end):
     price_corr_df = price_corr_df.resample('5T').mean()
     price_corr_df.rename(columns={price_corr_df.columns[0]: '2h', price_corr_df.columns[1]: '4h',
                                   price_corr_df.columns[2]: '8h'}, inplace=True)
+
+    # Convert timestamps to integers in milliseconds
     price_corr_df['timestamp'] = price_corr_df.index.view(int) // 10 ** 6
     price_corr_df.dropna(inplace=True)
     price_corr_df.reset_index(drop=True, inplace=True)
 
     points = []
 
+    # Prepare data points for InfluxDB
     for idx in price_corr_df.index:
         points.append({
             'time': int(price_corr_df.loc[idx, 'timestamp']),
@@ -78,62 +106,134 @@ def correlation_values_backfill(t_start, t_end):
             'fields': {'value': price_corr_df.iloc[idx, 2]}
         })
 
+        # Write points in batches of 1000 to avoid overload
         if len(points) >= 1000:
             connection.staging_client_spotswap.write_points(points, time_precision="ms")
             points = []
 
+    # Write any remaining points
     connection.staging_client_spotswap.write_points(points, time_precision="ms")
 
 
 class BackfillCVI:
     """
-    Backfill C(?)
-    Volatility Index
+    A class to backfill the Crypto Volatility Index (CVI) from an external API into InfluxDB.
+
+    The CVI provides a measure of volatility in the cryptocurrency market. This class retrieves
+    historical CVI data from an external API and writes it into an InfluxDB instance for analysis.
+
+    Attributes:
+    ----------
+    influx_connection : InfluxConnection
+        An instance of the InfluxConnection class for connecting to the InfluxDB database.
     """
 
     def __init__(self):
+        """
+        Initializes the BackfillCVI class.
+
+        Establishes a connection to the InfluxDB database using the InfluxConnection class.
+        """
         self.influx_connection = InfluxConnection.getInstance()
 
     def cvi_volatility_index(self, t_end):
+        """
+        Fetches and writes the CVI data to the database for the specified date.
+
+        Parameters:
+        ----------
+        t_end : datetime
+            The end date for fetching the CVI data. The data is fetched from the API for this date.
+
+        Example:
+        -------
+        >>> cvi = BackfillCVI()
+        >>> cvi.cvi_volatility_index(datetime(2023, 8, 1))
+        """
+        # Fetch historical CVI data from the API
         df = requests.get('https://api.dev-cvi-finance-route53.com/history?chain=Ethereum&index=CVI',
                           params={'Date': f'{t_end}'})
 
+        # Convert JSON response to NumPy array
         cvi = np.array(df.json())
         points = []
 
-        # print(max_p)
-
+        # Prepare data points for InfluxDB
         for ix in range(len(cvi)):
             point = {
-                'time': int(cvi[ix, 0] * 1000),
+                'time': int(cvi[ix, 0] * 1000),  # Convert to milliseconds
                 'measurement': 'dvol',
                 'tags': {'coin': 'CVI'},
                 'fields': {'close': cvi[ix, 1]}
             }
             points.append(point)
 
+        # Write points to the database
         self.influx_connection.prod_client_spotswap.write_points(points, time_precision='ms')
-        # print(points)
-        # print(len(points))
 
 
 class QualityOfExecutions:
+    """
+    A class to evaluate the quality of trade executions for a specified strategy and time range.
+
+    This class computes the quality of executions by comparing actual executed spreads with
+    theoretical bands, and writes the results to an InfluxDB instance for further analysis.
+
+    Attributes:
+    ----------
+    influx_connection : InfluxConnection
+        An instance of the InfluxConnection class for connecting to the InfluxDB database.
+    """
+
     def __init__(self):
+        """
+        Initializes the QualityOfExecutions class.
+
+        Establishes a connection to the InfluxDB database using the InfluxConnection class.
+        """
         self.influx_connection = InfluxConnection.getInstance()
 
     def backfill(self, t0, t1, strategy, entry_delta_spread, exit_delta_spread, window_size, environment):
+        """
+        Computes and backfills execution quality data for the specified strategy and time range.
 
+        This method retrieves executed spreads and band data from the InfluxDB database,
+        calculates the quality of executions, and writes the results back to the database.
+
+        Parameters:
+        ----------
+        t0 : int
+            The start timestamp in milliseconds for fetching data.
+        t1 : int
+            The end timestamp in milliseconds for fetching data.
+        strategy : str
+            The trading strategy being evaluated.
+        entry_delta_spread : float
+            The entry delta spread used in the evaluation.
+        exit_delta_spread : float
+            The exit delta spread used in the evaluation.
+        window_size : int
+            The window size for calculating execution quality.
+        environment : str
+            The environment for database connection, either 'production' or 'staging'.
+
+        Example:
+        -------
+        >>> qoe = QualityOfExecutions()
+        >>> qoe.backfill(1622548800000, 1622635200000, 'MyStrategy', 0.5, 0.3, 20, 'production')
+        """
+        # Choose the appropriate client and write method based on the environment
         client = self.influx_connection.prod_client_spotswap_dataframe if environment == 'production' else self.influx_connection.staging_client_spotswap_dataframe
         write = self.influx_connection.prod_client_spotswap if environment == 'production' else self.influx_connection.staging_client_spotswap
-        # entry_delta_spread and exit_delta_spread are in postgres
 
-        # the bands
+        # Query executed spread data
         result = client.query(f'''SELECT "spread", type, 
         volume_executed_spot  FROM "executed_spread" WHERE ("strategy" = '{strategy}') AND time >= {t0}ms AND time <= 
         {t1}ms ''', epoch='ns')
         if len(result) == 0:
             return
 
+        # Process execution data
         executions = result["executed_spread"]
         executions['Time'] = executions.index
         executions['entry_executions'] = executions[executions.type == 'entry']['spread']
@@ -141,6 +241,7 @@ class QualityOfExecutions:
         executions['entry_volume'] = executions[executions.type == 'entry']['volume_executed_spot']
         executions['exit_volume'] = executions[executions.type == 'exit']['volume_executed_spot']
 
+        # Query band data and determine entry and exit bands
         result2 = self.influx_connection.prod_client_spotswap_dataframe.query(f'''SELECT "value","side" FROM "band" 
             WHERE ("strategy" ='{strategy}' AND "type" = 'live') 
             AND time >= {t0 - 60000}ms and time <= {t1}ms''', epoch='ns')
@@ -159,6 +260,7 @@ class QualityOfExecutions:
             bands['Exit Band'] = bands.loc[bands['side'] == 'exit', 'value']
             bands.drop(columns=['side', 'value'], inplace=True)
 
+        # Merge execution and band data
         entry_exit_exec = pd.merge_ordered(executions, bands, on='Time')
         entry_exit_exec['Entry Band'].ffill(inplace=True)
         entry_exit_exec['Exit Band'].ffill(inplace=True)
@@ -166,6 +268,7 @@ class QualityOfExecutions:
         entry_exit_exec.reset_index(drop=True, inplace=True)
         points = []
 
+        # Calculate and prepare execution quality data points
         for ix in entry_exit_exec.index:
 
             if not math.isnan(entry_exit_exec['entry_executions'].loc[ix]):
@@ -212,41 +315,88 @@ class QualityOfExecutions:
                 }
                 points.append(point)
 
+            # Write points in batches of 10000 to avoid overload
             if len(points) > 10000:
                 write.write_points(points, time_precision='ms')
                 points = []
 
+        # Write any remaining points
         write.write_points(points, time_precision='ms')
 
 
 class BackfillDeribitVolatilityIndex:
+    """
+    A class to backfill the Deribit Volatility Index (DVol) data for BTC and ETH.
+
+    This class retrieves historical volatility data from the Deribit API and writes it to an InfluxDB instance for
+    analysis.
+
+    Attributes:
+    ----------
+    influx_connection : InfluxConnection
+        An instance of the InfluxConnection class for connecting to the InfluxDB database.
+    """
 
     def __init__(self):
+        """
+        Initializes the BackfillDeribitVolatilityIndex class.
+
+        Establishes a connection to the InfluxDB database using the InfluxConnection class.
+        """
         self.influx_connection = InfluxConnection.getInstance()
 
     def deribit_volatility(self, t_start, t_end):
+        """
+        Retrieves volatility index data from the Deribit API for BTC and ETH.
+
+        This method fetches volatility data for BTC and ETH from the Deribit API between the specified start and end
+        timestamps.
+
+        Parameters:
+        ----------
+        t_start : int
+            The start timestamp in milliseconds for fetching data.
+        t_end : int
+            The end timestamp in milliseconds for fetching data.
+
+        Returns:
+        -------
+        points : list
+            A list of data points formatted for InfluxDB, each containing volatility data for a specific coin and
+            timestamp.
+
+        Example:
+        -------
+        >>> dvi = BackfillDeribitVolatilityIndex()
+        >>> points = dvi.deribit_volatility(1622548800000, 1622635200000)
+        """
+
+        # Fetch volatility data for BTC from the Deribit API
         df = requests.get('https://www.deribit.com/api/v2/public/get_volatility_index_data',
                           params={'currency': "BTC",
                                   'start_timestamp': f"{t_start}",
                                   'resolution': 60,
                                   'end_timestamp': f"{t_end}"})
 
+        # Convert the JSON response to a NumPy array
         dvol_btc = np.array(df.json()['result']['data'])
 
+        # Fetch volatility data for ETH from the Deribit API
         dff = requests.get('https://www.deribit.com/api/v2/public/get_volatility_index_data',
                            params={'currency': "ETH",
                                    'start_timestamp': f"{t_start}",
                                    'resolution': 60,
                                    'end_timestamp': f"{t_end}"})
 
+        # Convert the JSON response to a NumPy array
         dvol_eth = np.array(dff.json()['result']['data'])
         points = []
 
+        # Determine the maximum number of data points
         max_p = max(len(dvol_btc), len(dvol_eth))
-        # print(max_p)
 
+        # Prepare data points for InfluxDB
         for ix in range(max_p):
-            # print(dvol_eth[ix,0])
             if ix <= len(dvol_eth) - 1 and len(dvol_eth) > 0:
                 point = {
                     'time': int(dvol_eth[ix, 0]),
@@ -269,63 +419,132 @@ class BackfillDeribitVolatilityIndex:
                                'close': dvol_btc[ix, 4]}
                 }
                 points.append(point)
+
         return points
 
     def write_points(self, t0, t1, env):
+        """
+        Writes volatility index data points to the InfluxDB database.
+
+        This method divides the time range into smaller intervals, retrieves volatility data for each interval, and
+        writes the data points to the database.
+
+        Parameters:
+        ----------
+        t0 : int
+            The start timestamp in milliseconds for writing data.
+        t1 : int
+            The end timestamp in milliseconds for writing data.
+        env : str
+            The environment for database connection, either 'staging' or 'production'.
+
+        Example:
+        -------
+        >>> dvi = BackfillDeribitVolatilityIndex()
+        >>> dvi.write_points(1622548800000, 1622635200000, 'staging')
+        """
+        # Select the appropriate client based on the environment
         if env == "staging":
             client = self.influx_connection.staging_client_spotswap
         else:
             client = self.influx_connection.prod_client_spotswap
 
+        # Check if the time range is small enough for a single request
         if t1 - t0 <= 1000 * 60 * 1000:
             points = self.deribit_volatility(t_start=t0, t_end=t1)
             client.write_points(points, time_precision='ms')
         else:
+            # Divide the time range into smaller intervals and write data points
             t_start = t0
             t_end = t_start + 1000 * 60 * 1000
 
             while t_end <= t1:
-                time.sleep(0.2)
+                time.sleep(0.2)  # Sleep to avoid rate limiting
                 points = self.deribit_volatility(t_start=t_start, t_end=t_end)
                 client.write_points(points, time_precision='ms')
                 t_start = t_start + 1000 * 60 * 1000
                 t_end = t_end + 1000 * 60 * 1000
-                # print(f'start_time: {t_start} end time: {t_end}')
-        # start = t0
-        # while start <= t1:
-        #     points = self.deribit_volatility(t0=start, t1=t1)
-        #     self.influx_connection.prod_client_spotswap.write_points(points, time_precision='ms')
-        #     start = points[-1]['time']
 
 
 class StrategyPNL:
+    """
+    A class to calculate the Profit and Loss (PnL) for a specified trading strategy.
+
+    This class computes the PnL by comparing the Mark-to-Market (MtM) values at the start and end of a specified time
+    range, and writes the results to an InfluxDB instance.
+
+    Attributes:
+    ----------
+    influx_connection : InfluxConnection
+        An instance of the InfluxConnection class for connecting to the InfluxDB database.
+    """
+
     def __init__(self):
+        """
+        Initializes the StrategyPNL class.
+
+        Establishes a connection to the InfluxDB database using the InfluxConnection class.
+        """
         self.influx_connection = InfluxConnection.getInstance()
 
     def strategy_pnl(self, t0, t1, strategy, transfers=0, environment='production'):
-        # define the place of the server
+        """
+        Calculates the PnL for a given strategy and time range.
+
+        This method retrieves MtM values from the InfluxDB database, calculates the PnL by finding the difference
+        between the start and end values, and optionally subtracts any transfers.
+
+        Parameters:
+        ----------
+        t0 : int
+            The start timestamp in milliseconds for calculating PnL.
+        t1 : int
+            The end timestamp in milliseconds for calculating PnL.
+        strategy : str
+            The trading strategy being evaluated.
+        transfers : float, optional
+            The amount of any transfers to subtract from the PnL calculation (default is 0).
+        environment : str, optional
+            The environment for database connection, either 'production' or 'staging' (default is 'production').
+
+        Returns:
+        -------
+        dict
+            A dictionary containing the calculated PnL, start value, start time, end value, and end time.
+
+        Example:
+        -------
+        >>> pnl = StrategyPNL()
+        >>> result = pnl.strategy_pnl(1622548800000, 1622635200000, 'MyStrategy', 100, 'production')
+        >>> print(result)
+        {'pnl': 500.0, 'start_value': 1000.0, 'start_time': 1622548800000, 'end_value': 1500.0, 'end_time': 1622635200000}
+        """
+        # Select the appropriate query based on the environment
         if environment == 'production':
-            result = self.influx_connection.prod_client_spotswap_dataframe.query(f'''SELECT "current_value" AS "MtM_value" 
-                                                                FROM "mark_to_market_changes" 
-                                                                WHERE ("strategy" = '{strategy}') 
-                                                                AND time >= {t0}ms and time <= {t1}ms''', epoch='ns')
+            result = self.influx_connection.prod_client_spotswap_dataframe.query(
+                f'''SELECT "current_value" AS "MtM_value" 
+                FROM "mark_to_market_changes" 
+                WHERE ("strategy" = '{strategy}') 
+                AND time >= {t0}ms and time <= {t1}ms''', epoch='ns')
         elif environment == 'staging':
-            result = self.influx_connection.staging_client_spotswap_dataframe.query(f'''SELECT "current_value" AS "MtM_value" 
-                                                                                        FROM "mark_to_market_changes" 
-                                                                                        WHERE ("strategy" = '{strategy}') 
-                                                                                        AND time >= {t0}ms and time <= {t1}ms''',
-                                                                                    epoch='ns')
+            result = self.influx_connection.staging_client_spotswap_dataframe.query(
+                f'''SELECT "current_value" AS "MtM_value" 
+                FROM "mark_to_market_changes" 
+                WHERE ("strategy" = '{strategy}') 
+                AND time >= {t0}ms and time <= {t1}ms''', epoch='ns')
         else:
             return
 
-        # if there are no values in this time interval then return
+        # Return if no data is available
         if len(result) == 0:
             return
 
+        # Process the MtM values
         df = result["mark_to_market_changes"]
         df['timems'] = df.index.view(int)
         df['MtM_value'].ffill(inplace=True)
 
+        # Determine the time delta and rolling window size
         if t1 - t0 <= 1000 * 60 * 60:
             return
         elif t1 - t0 <= 1000 * 60 * 60 * 12:
@@ -334,8 +553,6 @@ class StrategyPNL:
             cmean['timems'] = cmean.index.view(int)
             cstd = df['MtM_value'].rolling('20m', min_periods=1).std()
             cstd['timems'] = cstd.index.view(int)
-
-
         else:
             time_delta = 1000 * 60 * 6
             cmean = df['MtM_value'].rolling('1h', min_periods=1).mean()
@@ -343,7 +560,7 @@ class StrategyPNL:
             cstd = df['MtM_value'].rolling('1h', min_periods=1).std()
             cstd['timems'] = cstd.index.view(int)
 
-        # find local minima of std in first period
+        # Find local minima of std in the first period
         start_idx = cstd[cstd['timems'] >= t0, cstd['timems'] <= t0 + time_delta, 'MtM_value'].idxmin()
         start_value = cmean.loc[cmean.index == start_idx, 'MtM_value']
         start_time = cstd.loc[start_idx, 'timems']
@@ -352,6 +569,7 @@ class StrategyPNL:
         end_value = cmean.loc[cmean.index == end_idx, 'MtM_value']
         end_time = cstd.loc[end_idx, 'timems']
 
+        # Calculate PnL
         if not math.isnan(transfers):
             pnl = (end_value - start_value) - transfers
         else:
@@ -362,24 +580,64 @@ class StrategyPNL:
 
 
 class BackfillInverseQuantoProfit:
+    """
+    A class to backfill the Inverse Quanto Profit (IQP) data.
+
+    This class retrieves historical IQP data for a specified strategy and time range, computes the IQP values, and
+    writes them to an InfluxDB instance.
+
+    Attributes:
+    ----------
+    influx_connection : InfluxConnection
+        An instance of the InfluxConnection class for connecting to the InfluxDB database.
+    """
 
     def __init__(self):
+        """
+        Initializes the BackfillInverseQuantoProfit class.
+
+        Establishes a connection to the InfluxDB database using the InfluxConnection class.
+        """
         self.influx_connection = InfluxConnection.getInstance()
 
     def inverse_quanto_profit(self, t0, t1, strategy):
+        """
+        Calculates the Inverse Quanto Profit (IQP) for a given strategy and time range.
 
+        This method retrieves IQP data from the InfluxDB database, computes the IQP values using the
+        fast_inverse_quanto_profit function, and writes the results to the database.
+
+        Parameters:
+        ----------
+        t0 : int
+            The start timestamp in milliseconds for calculating IQP.
+        t1 : int
+            The end timestamp in milliseconds for calculating IQP.
+        strategy : str
+            The trading strategy being evaluated.
+
+        Example:
+        -------
+        >>> iqp = BackfillInverseQuantoProfit()
+        >>> iqp.inverse_quanto_profit(1622548800000, 1622635200000, 'MyStrategy')
+        """
+        # Query IQP data
         past = time.time()
         df = get_quanto_profit(t0, t1, strategy)
         print(f'It took {time.time() - past} to query the data')
+
+        # Process IQP data
         df['Time'] = df.index
         df['timems'] = df['Time'].astype(int) / 10 ** 6
         df.reset_index(drop=True, inplace=True)
         df['IQP'] = 0
         df['IQP_sum'] = 0
 
-        result = self.influx_connection.prod_client_spotswap_dataframe.query(f'''SELECT "value" FROM "inverse_quanto_profit" 
-                               WHERE( "strategy" ='{strategy}')AND time >= {t0 - 1000 * 60 * 2}ms and time <= {t0}ms''',
-                                                                             epoch='ns')
+        # Query previous IQP values
+        result = self.influx_connection.prod_client_spotswap_dataframe.query(
+            f'''SELECT "value" FROM "inverse_quanto_profit" 
+            WHERE( "strategy" ='{strategy}')AND time >= {t0 - 1000 * 60 * 2}ms and time <= {t0}ms''',
+            epoch='ns')
 
         if len(result) > 0 and len(result["inverse_quanto_profit"]) != 0 and result["inverse_quanto_profit"]['value'][
             -1] != 0:
@@ -388,23 +646,14 @@ class BackfillInverseQuantoProfit:
 
         past = time.time()
 
+        # Calculate IQP using fast_inverse_quanto_profit
         quanto_profits = np.array(df['Quanto profit per ETH'])
         iqps = np.array(df[['IQP', 'IQP_sum']])
-        # iqps_sum = np.array(df['IQP_sum'])
         iqps = np.array(fast_inverse_quanto_profit(max_qp.astype(np.float64), quanto_profits.astype(np.float64),
                                                    iqps.astype(np.float64)))
-        #
-        # for idx_p, idx_c in zip(df.index[:-1], df.index[1:]):
-        #     if max_qp < df.loc[idx_c, 'Quanto profit per ETH'] and df.loc[idx_c, 'Quanto profit per ETH'] >= 1:
-        #         max_qp = df.loc[idx_c, 'Quanto profit per ETH']
-        #
-        #     elif max_qp > df.loc[idx_c, 'Quanto profit per ETH'] and df.loc[idx_c, 'Quanto profit per ETH'] >= 1:
-        #         df.loc[idx_c, 'IQP'] = df.loc[idx_p, 'Quanto profit per ETH'] - df.loc[idx_c, 'Quanto profit per ETH']
-        #         df.loc[idx_c, 'IQP_sum'] = df.loc[idx_p, 'IQP_sum'] + df.loc[idx_c, 'IQP']
-        #         if df.loc[idx_c, 'IQP_sum'] < 0:
-        #             df.loc[idx_c, 'IQP_sum'] = 0
         points = []
 
+        # Prepare IQP data points for InfluxDB
         for ix in df.index:
             point = {
                 'time': int(df.loc[ix, 'timems']),
@@ -416,13 +665,10 @@ class BackfillInverseQuantoProfit:
             points.append(point)
 
             if len(points) >= 10000:
-                # pass
                 self.influx_connection.prod_client_spotswap.write_points(points, time_precision='ms')
                 points = []
 
         if len(points) != 0:
-            # pass
-            # print(points)
             self.influx_connection.prod_client_spotswap.write_points(points, time_precision='ms')
 
         print(f'It took {time.time() - past} to compute stuff')
@@ -430,6 +676,33 @@ class BackfillInverseQuantoProfit:
 
 @numba.jit(nopython=True)
 def fast_inverse_quanto_profit(max_qp, quanto_profits, iqps):
+    """
+    A Numba-optimized function to calculate Inverse Quanto Profit (IQP) values efficiently.
+
+    This function iterates through the quanto profits array, updating the IQP and IQP_sum values based on changes in
+    quanto profits.
+
+    Parameters:
+    ----------
+    max_qp : float
+        The maximum quanto profit observed so far.
+    quanto_profits : np.ndarray
+        An array of quanto profits for each timestamp.
+    iqps : np.ndarray
+        A 2D array containing IQP and IQP_sum values for each timestamp.
+
+    Returns:
+    -------
+    np.ndarray
+        The updated 2D array of IQP and IQP_sum values.
+
+    Example:
+    -------
+    >>> max_qp = 1.5
+    >>> quanto_profits = np.array([1.2, 1.4, 1.3])
+    >>> iqps = np.zeros((len(quanto_profits), 2))
+    >>> result = fast_inverse_quanto_profit(max_qp, quanto_profits, iqps)
+    """
     for j in range(1, len(quanto_profits)):
         if quanto_profits[j] >= 1:
             if max_qp < quanto_profits[j]:
@@ -437,14 +710,40 @@ def fast_inverse_quanto_profit(max_qp, quanto_profits, iqps):
             elif max_qp > quanto_profits[j]:
                 iqps[j, 0] = quanto_profits[j - 1] - quanto_profits[j]
                 iqps[j, 1] = max(iqps[j - 1, 1] + iqps[j, 0], 0.0)
-                # if iqps_sum[j] < 0:
-                #     iqps_sum[j] = 0
     return iqps
 
 
 def backfill_maker_maker_evaluations(displacement, t0, t1, taker_slippage_spot=2.5, taker_slippage_swap=2.5,
-                                     use_backblaze=True, use_wandb=True,
-                                     to_influx=True):
+                                     use_backblaze=True, use_wandb=True, to_influx=True):
+    """
+    A function to backfill maker-maker evaluations for a specified trading strategy.
+
+    This function simulates trading activity for a maker-maker strategy, evaluates the quality of executions, and writes
+    the results to an InfluxDB instance.
+
+    Parameters:
+    ----------
+    displacement : float
+        The displacement value used in the strategy.
+    t0 : datetime.datetime
+        The start datetime for the simulation.
+    t1 : datetime.datetime
+        The end datetime for the simulation.
+    taker_slippage_spot : float, optional
+        The slippage for taker orders on spot exchanges (default is 2.5).
+    taker_slippage_swap : float, optional
+        The slippage for taker orders on swap exchanges (default is 2.5).
+    use_backblaze : bool, optional
+        Flag to indicate whether to use Backblaze for storage (default is True).
+    use_wandb : bool, optional
+        Flag to indicate whether to use Weights & Biases for logging (default is True).
+    to_influx : bool, optional
+        Flag to indicate whether to write results to InfluxDB (default is True).
+
+    Example:
+    -------
+    >>> backfill_maker_maker_evaluations(0.5, datetime.datetime(2023, 1, 1), datetime.datetime(2023, 1, 2))
+    """
     lookback = None
     recomputation_time = None
     target_percentage_exit = None
@@ -480,9 +779,9 @@ def backfill_maker_maker_evaluations(displacement, t0, t1, taker_slippage_spot=2
     maker_fee_swap, taker_fee_swap = exchange_fees(exchange_swap, swap_instrument, exchange_swap, swap_instrument)
     maker_fee_spot, taker_fee_spot = exchange_fees(exchange_spot, spot_instrument, exchange_spot, spot_instrument)
 
-    # latencies default values
+    # Latencies default values
     ws_swap, api_swap, ws_spot, api_spot = set_latencies_auto(exchange_swap, exchange_spot)
-    # latencies
+    # Latencies
     latency_spot = ws_spot
     latency_try_post_spot = api_spot
     latency_cancel_spot = api_spot
@@ -500,7 +799,7 @@ def backfill_maker_maker_evaluations(displacement, t0, t1, taker_slippage_spot=2
 
     file_id = random.randint(10 ** 6, 10 ** 7)
 
-    # convert milliseconds to datetime
+    # Convert milliseconds to datetime
     date_start = datetime.datetime.fromtimestamp(t_start / 1000.0, tz=datetime.timezone.utc)
     date_end = datetime.datetime.fromtimestamp(t_end / 1000.0, tz=datetime.timezone.utc)
 
@@ -521,7 +820,8 @@ def backfill_maker_maker_evaluations(displacement, t0, t1, taker_slippage_spot=2
               'max_trade_volume': max_trade_volume, 'max_position': max_position,
               'function': 'simulation_trader_maker_maker'}
     params_df = pd.DataFrame(params, index=[0])
-    # send message for simulation initialization
+
+    # Send message for simulation initialization
     now = datetime.datetime.now()
     dt_string_start = now.strftime("%d/%m/%Y %H:%M:%S")
     data = {
@@ -583,18 +883,7 @@ def backfill_maker_maker_evaluations(displacement, t0, t1, taker_slippage_spot=2
     simulated_executions_maker['temp'] = simulated_executions_maker['executed_spread'] - simulated_executions_maker[
         'targeted_spread'] + to_decimal(simulated_executions_maker['displacement']) * simulated_executions_taker[
                                              'price']
-    # fig = plt.scatter(simulated_executions_maker['targeted_spread'], simulated_executions_maker['temp'])
-    # plt.title(f"Displacement {displacement}")
-    # plt.show()
-    # fig = plt.scatter(simulated_executions_maker['targeted_spread'], simulated_executions_maker['r'])
-    # plt.title(f"Displacement {displacement}")
-    # plt.show()
-    # fig = plt.scatter(simulated_executions_taker['targeted_spread'], simulated_executions_taker['temp'])
-    # plt.title(f"Displacement {displacement}")
-    # plt.show()
-    # fig = plt.scatter(simulated_executions_taker['targeted_spread'], simulated_executions_taker['r'])
-    # plt.title(f"Displacement {displacement}")
-    # plt.show()
+
     maker_maker_points = []
     for _, row in simulated_executions_maker.iterrows():
         maker_maker_points.append({

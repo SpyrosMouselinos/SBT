@@ -4,6 +4,12 @@ import numba
 
 
 def compute_rolling_pnl(funding, executions, funding_system):
+    """
+     @brief Compute rolling PNL for each execution. We need to compute the rolling pricelevel and summation of the spreads for each execution in order to make the summation easier.
+     @param funding DataFrame with funding information. Must have'side'and'entry'columns
+     @param executions DataFrame with executions in the format returned by compute_pro
+     @param funding_system
+    """
     entry_executions = executions[executions['side'] == 'entry']
     entry_executions.reset_index(drop=True, inplace=True)
     entry_executions['entry_spread_volume'] = entry_executions['executed_spread'] * entry_executions['traded_volume']
