@@ -36,11 +36,12 @@ class QuantoProfitBuildQuanto(QuantoSystemEmpty):
         # computes the quanto tp box signal
         if self.price_box_params:
             print("Computing quanto tp box signal")
-            self.quanto_tp_signal = get_price_box_signal(self.price_box_params.t0-1000*60*int(self.rolling_time_window_size),
-            self.price_box_params.t1,
-            self.price_box_params.basis_points,
-            self.price_box_params.aggr_window,
-            self.price_box_params.span)
+            self.quanto_tp_signal = get_price_box_signal(
+                self.price_box_params.t0 - 1000 * 60 * int(self.rolling_time_window_size),
+                self.price_box_params.t1,
+                self.price_box_params.basis_points,
+                self.price_box_params.aggr_window,
+                self.price_box_params.span)
             self.quanto_tp_signal['timems'] = self.quanto_tp_signal['end_time'].view(np.int64) // 10 ** 6
             self.quanto_tp_signal['triggered'] = False
 
@@ -82,7 +83,8 @@ class QuantoProfitBuildQuanto(QuantoSystemEmpty):
                 self.price_box_params.upper_threshold_crossed = True
             # if lower_threshold_crossed and upper_threshold_crossed are true then the lower threshold crossed is set to false
             if self.price_box_params.upper_threshold_crossed and \
-                    self.quanto_tp_signal.iloc[self.price_box_params.idx_p].signal < self.price_box_params.lower_threshold:
+                    self.quanto_tp_signal.iloc[
+                        self.price_box_params.idx_p].signal < self.price_box_params.lower_threshold:
                 self.price_box_params.lower_threshold_crossed = False
                 self.price_box_params.upper_threshold_crossed = False
             # If the quanto_tp_signal is too low then trigger the signal.
@@ -104,7 +106,7 @@ class QuantoProfitBuildQuanto(QuantoSystemEmpty):
                                               avg_price_btc=self.price_btc_p, price_btc=self.price_btc_t,
                                               coin_volume=volume)
         box_movement = 0
-        additional_quanto_profit = max(quanto_loss_virtual - (entry_band - exit_band),0)
+        additional_quanto_profit = max(quanto_loss_virtual - (entry_band - exit_band), 0)
         # The box movement ratio of the quanto profit.
         if self.price_box_params and self.price_box_params.upper_threshold_crossed:
             box_movement = self.price_box_params.entry_movement_ratio * additional_quanto_profit

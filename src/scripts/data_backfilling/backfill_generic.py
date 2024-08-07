@@ -3,14 +3,10 @@ import math
 import warnings
 import datetime
 import random
-import numba
 from dotenv import load_dotenv, find_dotenv
-
-from old_code.maker_maker.MakerMakerMasterFile import DisplacementEvaluationNoSpreadEntry
+from src.common.constants.constants import exchange_fees, set_latencies_auto
 from src.common.queries.queries import *
-from src.simulations.simulation_codebase.latencies_fees.latencies_fees import set_latencies_auto, \
-    exchange_fees
-from src.common.utils.utils import to_decimal, get_data_for_trader
+from src.common.utils.utils import to_decimal
 
 warnings.filterwarnings("ignore")
 load_dotenv(find_dotenv())
@@ -713,6 +709,10 @@ def fast_inverse_quanto_profit(max_qp, quanto_profits, iqps):
     return iqps
 
 
+class DisplacementEvaluationNoSpreadEntry:
+    pass
+
+
 def backfill_maker_maker_evaluations(displacement, t0, t1, taker_slippage_spot=2.5, taker_slippage_swap=2.5,
                                      use_backblaze=True, use_wandb=True, to_influx=True):
     """
@@ -828,7 +828,7 @@ def backfill_maker_maker_evaluations(displacement, t0, t1, taker_slippage_spot=2
         "message": f"Simulation (MM) of {strategy} from {date_start} to {date_end} Started at {dt_string_start} UTC",
     }
 
-    band_values = get_entry_exit_bands(t0=t_start, t1=t_end, strategy=strategy, entry_delta_spread=0,
+    band_values = get_entry_exit_bands(t_start=t_start, t_end=t_end, strategy=strategy, entry_delta_spread=0,
                                        exit_delta_spread=0, btype='central_band', environment=environment)
     band_values.rename(columns={'Band': 'Central Band'}, inplace=True)
 

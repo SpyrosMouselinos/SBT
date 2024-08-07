@@ -6,7 +6,6 @@ from src.common.utils.quanto_utils import quanto_pnl_func
 
 
 class QuantoSystemEmpty:
-
     w_avg_price_btc = 0
     w_avg_price_eth = 0
     coin_volume = 0
@@ -65,8 +64,8 @@ class QuantoSystemEmpty:
         price_eth_t = self.price_eth.loc[self.eth_idx, 'price']
         # average price of the volume of the current execution
         if cum_volume > 0 and execution_side == 'entry':
-            self.w_avg_price_btc = abs((self.w_avg_price_btc*(cum_volume-traded_volume) +
-                                        traded_volume*price_btc_t) / cum_volume)
+            self.w_avg_price_btc = abs((self.w_avg_price_btc * (cum_volume - traded_volume) +
+                                        traded_volume * price_btc_t) / cum_volume)
             self.w_avg_price_eth = abs((self.w_avg_price_eth * (cum_volume - traded_volume) +
                                         traded_volume * price_eth_t) / cum_volume)
         elif cum_volume < 0 and execution_side == 'exit':
@@ -87,7 +86,6 @@ class QuantoSystemEmpty:
         else:
             self.coin_volume = - cum_volume / self.w_avg_price_eth
             self.contracts = - cum_volume / (self.w_avg_price_eth * self.w_avg_price_btc * 0.000001)
-
 
     def update(self, timestamp, position):
         """
@@ -113,7 +111,8 @@ class QuantoSystemEmpty:
         if self.coin_volume != 0 or self.contracts != 0:
             self.quanto_loss = quanto_pnl_func(price_eth=self.price_eth_t, avg_price_eth=self.w_avg_price_eth,
                                                price_btc=self.price_btc_t, avg_price_btc=self.w_avg_price_btc,
-                                               coin_volume=abs(self.contracts / self.coin_volume) * np.sign(self.contracts))
+                                               coin_volume=abs(self.contracts / self.coin_volume) * np.sign(
+                                                   self.contracts))
         else:
             self.quanto_loss = 0
         self.quanto_loss_pnl = self.quanto_loss * abs(self.coin_volume)
@@ -144,7 +143,7 @@ class QuantoSystemEmpty:
          @return A tuple of : class : ` ~chainer. adjustments. BandAdjustments ` that are applied
         """
         return self.entry_band_adjustment(entry_band, exit_band, move_exit, position), \
-               self.exit_band_adjustment(entry_band, exit_band, move_exit, position)
+            self.exit_band_adjustment(entry_band, exit_band, move_exit, position)
 
     def entry_band_adjustment(self, e, ex, me, pos):
         """
@@ -167,6 +166,7 @@ class QuantoSystemEmpty:
          @return The number of errors to be added to the exit band. For example if you want to make a decision on the size of the exit band then call this method
         """
         return 0
+
 
 @dataclass
 class PriceBoxParams():
@@ -210,7 +210,7 @@ class QuantoLossSystem(QuantoSystemEmpty):
     halt_trading_flag = False
 
     def __init__(self, price_btc, price_eth, current_r, high_r, quanto_threshold, distance, high_to_current,
-                 ratio_entry_band_mov,  window, ratio_entry_band_mov_ind):
+                 ratio_entry_band_mov, window, ratio_entry_band_mov_ind):
         """
         @brief Initialize the object. This is the method that will be called by the class when it is instantiated.
         @param price_btc The price of the btc price.
@@ -315,6 +315,4 @@ class QuantoLossSystem(QuantoSystemEmpty):
             return self.ratio_entry_band_mov * self.quanto_loss
         return 0
 
-
 # quanto_profit_systems = {"QuantoProfitSystem": QuantoProfitSystem, "QuantoProfitBuildQuanto": QuantoProfitBuildQuanto}
-

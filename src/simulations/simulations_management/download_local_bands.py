@@ -1,7 +1,6 @@
 import argparse
 import time
 from src.common.utils.utils import parse_args
-from src.common.equinox_api_call import DatalinkCreateBands
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
@@ -17,7 +16,7 @@ if __name__ == '__main__':
     parser.add_argument('--band_type', default="bogdan_bands", type=str)
     parser.add_argument('--environment', default="staging", type=str)
     parser.add_argument('--band_funding_system', default='No', type=str)
-    parser.add_argument('--funding_window', default= 90, type=int)
+    parser.add_argument('--funding_window', default=90, type=int)
     parser.add_argument('--move_bogdan_band', default='No', type=str)
     parser.add_argument('--funding_system', default='No', type=str)
     parser.add_argument('--generate_percentage_bands', default='False', type=str)
@@ -40,7 +39,6 @@ if __name__ == '__main__':
     params['entry_delta_spread'] = 4
     params['force_band_creation'] = True
     params['move_bogdan_band'] = 'No'
-
 
     for pair_name in tokens_to_use:
         instruments = pair_name.split("~")

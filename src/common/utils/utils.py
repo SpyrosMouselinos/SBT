@@ -16,6 +16,7 @@ import os
 import pandas as pd
 import numpy as np
 
+
 def itertools_flatten(aList):
     """
     Flatten a list of lists into a single list.
@@ -570,6 +571,7 @@ class Util:
         with open(os.path.join(artifact_dir, f'writer_{current_run_from_api.id}.pkl'), 'rb') as f:
             writer = pickle.load(f)
         return writer
+
     @staticmethod
     def load_writer_to_artifact(initialised_wandb, writer, dir):
         """
@@ -1469,5 +1471,3 @@ def spread_exit_func_bp(exit_swap, exit_spot, swap_fee, spot_fee):
     @return The exit spread in basis points between the swap and spot prices.
     """
     return (exit_swap * (1 + swap_fee) - exit_spot * (1 - spot_fee)) / exit_swap * 10000
-
-

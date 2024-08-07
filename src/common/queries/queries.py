@@ -995,7 +995,7 @@ def get_strat_curr_value(t0, t1, strategy, environment='production'):
     df = df[['Time', 'strategy_value', 'spot_funds', 'swap_funds']]
     return df
 
-def get_entry_exit_bands(t0, t1, strategy, entry_delta_spread, exit_delta_spread, btype='central_band',
+def get_entry_exit_bands(t_start, t_end, strategy, entry_delta_spread, exit_delta_spread, btype='central_band',
                          environment='production'):
     """
     @brief Retrieves the central, entry, and exit bands for a given strategy within a specified time range.
@@ -1003,8 +1003,8 @@ def get_entry_exit_bands(t0, t1, strategy, entry_delta_spread, exit_delta_spread
     This function queries the InfluxDB to obtain the central band and calculates the entry and exit bands
     for the specified strategy. The bands are based on the provided entry and exit delta spreads.
 
-    @param t0 The starting time in milliseconds.
-    @param t1 The ending time in milliseconds.
+    @param t_start The starting time in milliseconds.
+    @param t_end The ending time in milliseconds.
     @param strategy The name of the strategy.
     @param entry_delta_spread The entry delta spread for the given strategy.
     @param exit_delta_spread The exit delta spread for the given strategy.
@@ -1023,16 +1023,16 @@ def get_entry_exit_bands(t0, t1, strategy, entry_delta_spread, exit_delta_spread
     """
     if environment == 'server':
         result = client1.query(f'''SELECT ("exit_window_avg" + "entry_window_avg")/2 AS "Band"
-        FROM bogdan_bins_{strategy} WHERE time >= {t0}ms and time <= {t1}ms''', epoch='ns')
+        FROM bogdan_bins_{strategy} WHERE time >= {t_start}ms and time <= {t_end}ms''', epoch='ns')
     elif environment == 'production':
         connection = InfluxConnection.getInstance()
         result = connection.prod_client_spotswap_dataframe.query(
-            f'''SELECT ("exit_window_avg" + "entry_window_avg")/2 AS "Band" FROM "bogdan_bins_{strategy}" WHERE time >= {t0}ms and time <= {t1}ms''',
+            f'''SELECT ("exit_window_avg" + "entry_window_avg")/2 AS "Band" FROM "bogdan_bins_{strategy}" WHERE time >= {t_start}ms and time <= {t_end}ms''',
             epoch='ns')
     elif environment == 'staging':
         connection = InfluxConnection.getInstance()
         result = connection.staging_client_spotswap_dataframe.query(
-            f'''SELECT ("exit_window_avg" + "entry_window_avg")/2 AS "Band" FROM "bogdan_bins_{strategy}" WHERE time >= {t0}ms and time <= {t1}ms''',
+            f'''SELECT ("exit_window_avg" + "entry_window_avg")/2 AS "Band" FROM "bogdan_bins_{strategy}" WHERE time >= {t_start}ms and time <= {t_end}ms''',
             epoch='ns')
 
     df = result[f'bogdan_bins_{strategy}']

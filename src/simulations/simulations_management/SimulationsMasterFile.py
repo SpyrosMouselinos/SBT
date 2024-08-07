@@ -409,8 +409,6 @@ class DataFetcher:
         end = end.date()
         ##---------------##
 
-
-
         t_start = start
         t_end = start + timedelta(days=1)
         while t_end <= end:

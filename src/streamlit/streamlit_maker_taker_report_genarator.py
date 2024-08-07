@@ -7,12 +7,11 @@ from dotenv import load_dotenv, find_dotenv
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from src.common.connections.DatabaseConnections import InfluxConnection
+from src.common.queries.funding_queries import funding_implementation
 from src.common.queries.queries import Prices, Takers, get_percentage_band_values, get_opportunity_points_all
 from src.common.utils.quanto_utils import bitmex_eth_prices, bitmex_btc_prices
 from src.common.utils.utils import sharpe_sortino_ratio_fun
 from src.scripts.data_backfilling.backfill_opportunities import BackfillOpportunityPoints
-from src.simulations.simulation_codebase.local_funding.funding_aggregated_function_implementation import \
-    funding_implementation
 from src.simulations.simulation_codebase.pnl_computation_functions.pnl_computation import \
     compute_rolling_pnl
 from src.common.clients.backblaze_client import BackblazeClient
@@ -359,30 +358,10 @@ def report_generator_maker_taker():
 
         # funding report
         funding_spot, funding_swap, funding_total, spot_funding, swap_funding = \
-            funding_implementation(t0=t_start, t1=t_end,
-                                   swap_exchange=exchange_swap,
-                                   swap_symbol=swap_instrument,
-                                   spot_exchange=exchange_spot,
-                                   spot_symbol=spot_instrument,
-                                   position_df=duration_pos_df,
-                                   environment=environment)
+            funding_implementation(t_start=t_start, t_end=t_end, swap_exchange=exchange_swap,
+                                   swap_symbol=swap_instrument, spot_exchange=exchange_spot,
+                                   spot_symbol=spot_instrument, position_df=duration_pos_df, environment=environment)
         print('funding computation done')
-        # st.write('spot_funding')
-        # st.dataframe(spot_funding.head(1000))
-        # st.dataframe(spot_funding.tail(1000))
-        # st.write('swap_funding')
-        # st.dataframe(swap_funding)
-        # if exchange_spot == 'Deribit':
-        #     spot_funding['Time'] = pd.to_datetime(spot_funding['timems'], unit='ms', utc=True)
-        #     spot_funding.set_index('Time', inplace=True)
-        #     spot_funding = spot_funding.resample('5T').sum()
-        #     spot_funding.reset_index(inplace=True)
-        #
-        # if exchange_swap == 'Deribit':
-        #     swap_funding['Time'] = pd.to_datetime(swap_funding['timems'], unit='ms', utc=True)
-        #     swap_funding.set_index('Time', inplace=True)
-        #     swap_funding = swap_funding.resample('5T').sum()
-        #     swap_funding.reset_index(inplace=True)
 
         spot_funding.reset_index(drop=True, inplace=True)
         swap_funding.reset_index(drop=True, inplace=True)
@@ -392,9 +371,6 @@ def report_generator_maker_taker():
         funding_df['total'] = funding_df['cum_spot'] + funding_df['cum_swap'].ffill()
         funding_df['Time'] = pd.to_datetime(funding_df['timems'], unit='ms', utc=True)
         funding_df_new = funding_df[['Time', 'cum_spot', 'cum_swap', 'total']].resample('5T', on='Time').last()
-        # st.dataframe(funding_df.head(1000))
-        # print('funding merge is done length of funding dataframe:', len(funding_df))
-        # pnl chart data
         pnl_chart = compute_rolling_pnl(funding_df, simulated_executions, funding_system)
         print('rolling pnl is done, length of pnl chart:', len(pnl_chart))
 

@@ -38,5 +38,3 @@ class RpcClient(object):
             body=json.dumps(body)
         )
         return
-
-

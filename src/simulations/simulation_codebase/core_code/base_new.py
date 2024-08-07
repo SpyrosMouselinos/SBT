@@ -5,15 +5,16 @@ import functools
 from transitions import Machine
 import numpy as np
 from src.common.constants.constants import one_hour
+from src.common.queries.funding_queries import funding_systems, funding_classes
 from src.common.queries.queries import get_funding_for_symbol, \
-    get_predicted_funding_for_symbol, get_realtime_funding_values
+    get_predicted_funding_for_symbol, get_realtime_funding_values, create_price_dataframe_local_folder
 import logging
 from pytictoc import TicToc
 import warnings
-from src.common.utils.local_funding import funding_classes, funding_systems
-from src.common.utils.utils import bp_to_dollars, create_price_dataframe_local_folder, get_index_left, pop_old, \
-    count_from_end, spread_entry_func_numba, spread_exit_func_numba, spread_entry_func_bp_numba, \
-    spread_exit_func_bp_numba, get_index_right
+
+from src.common.utils.trader_utils import get_index_left, get_index_right
+from src.common.utils.utils import spread_entry_func_numba, spread_exit_func_numba, spread_entry_func_bp_numba, \
+    spread_exit_func_bp_numba, bp_to_dollars, pop_old, count_from_end
 from src.simulations.simulation_codebase.quanto_systems.QuantoBoth import QuantoBothSystem
 from src.simulations.simulation_codebase.quanto_systems.QuantoBothExtended import QuantoBothExtendedSystem
 from src.simulations.simulation_codebase.quanto_systems.QuantoExponential import QuantoProfitSystemExponential
@@ -1631,4 +1632,3 @@ def check_spread_and_depth_in_posted(side, spread_entry, entry_band, swap_price,
         if (spread_exit > exit_band) | (price_swap_exit - swap_price > targeted_depth_usd):
             return True
         return False
-

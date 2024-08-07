@@ -611,6 +611,7 @@ class BackfillTradesBitfinex(BackfillTrades):
                 points_to_write = []
         print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
+
 class BackfillTradesBitflyer(BackfillTrades):
     """
     A class for backfilling trade data from the Bitflyer exchange.
@@ -1235,7 +1236,6 @@ class BackfillTradesWOO(BackfillTrades):
                 f" to {datetime.fromtimestamp(trades_df['time'].max() / (1000 * 1000 * 1000))}, "
                 f"ends in {datetime.fromtimestamp(start)}")
         print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
-
 
 
 def start_backfill(exchanges):

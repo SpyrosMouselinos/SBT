@@ -16,9 +16,6 @@ load_dotenv(find_dotenv())
 
 
 def report_generator_maker_maker():
-    disable_opp = st.sidebar.selectbox('Disable Opportunity Points creation', ('yes', 'no'))
-    store_opp = st.sidebar.selectbox('Store the Opportunity points', ('no', 'yes'))
-
     date_range = st.date_input("Enter a period where the report is genarated",
                                [datetime.date.today() - datetime.timedelta(days=7), datetime.date.today()])
 
@@ -281,7 +278,7 @@ def report_generator_maker_maker():
         percentage_executions_maker_entry = len(maker_entries) / (len(maker_entries) + len(taker_entries)) if len(
             maker_entries) + len(taker_entries) > 0 else 0
         percentage_executions_maker = (len(maker_entries) + len(maker_exits)) / (
-                    len(maker_entries) + len(maker_exits) + len(taker_entries) + len(taker_exits))
+                len(maker_entries) + len(maker_exits) + len(taker_entries) + len(taker_exits))
 
         col_res_1, col_res_2, col_res_3 = st.columns(3)
         col_res_1.markdown(
@@ -448,7 +445,7 @@ def report_generator_maker_maker():
         fig.add_trace(go.Scatter(
             x=band_values.loc[(~band_values['Central Band'].isna()) & (band_values['Central Band'] <= 200), 'Time'],
             y=band_values.loc[(~band_values['Central Band'].isna()) & (
-                        band_values['Central Band'] <= 200), 'breakeven_band_entry_balancing_spot'],
+                    band_values['Central Band'] <= 200), 'breakeven_band_entry_balancing_spot'],
             line=dict(color="rgb(8,116,54)"),
             line_shape='hv',
             mode='lines',
@@ -456,7 +453,7 @@ def report_generator_maker_maker():
         fig.add_trace(go.Scatter(
             x=band_values.loc[(~band_values['Central Band'].isna()) & (band_values['Central Band'] <= 200), 'Time'],
             y=band_values.loc[(~band_values['Central Band'].isna()) & (
-                        band_values['Central Band'] <= 200), 'breakeven_band_exit_balancing_swap'],
+                    band_values['Central Band'] <= 200), 'breakeven_band_exit_balancing_swap'],
             line=dict(color="rgb(255,153,153)"),
             line_shape='hv',
             mode='lines',

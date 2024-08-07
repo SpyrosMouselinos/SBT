@@ -82,11 +82,11 @@ class QuantoProfitSystemExponential(QuantoSystemEmpty):
                                                                                        int(self.rolling_time_window_size),
                                                                                        side='left') + self.eth_idx_p
         self.btc_idx_p2 = self.price_btc.loc[self.btc_idx_p:, 'timestamp'].searchsorted(timestamp - 1000 * 60 *
-                                                                                       int(self.rolling_time_window_size2),
-                                                                                       side='left') + self.btc_idx_p2
+                                                                                        int(self.rolling_time_window_size2),
+                                                                                        side='left') + self.btc_idx_p2
         self.eth_idx_p2 = self.price_eth.loc[self.eth_idx_p:, 'timestamp'].searchsorted(timestamp - 1000 * 60 *
-                                                                                       int(self.rolling_time_window_size2),
-                                                                                       side='left') + self.eth_idx_p2
+                                                                                        int(self.rolling_time_window_size2),
+                                                                                        side='left') + self.eth_idx_p2
         # print(f"index now {self.eth_idx}, previous index {self.eth_idx_p}")
         # Set the price of the btc to the next price.
         if self.btc_idx_p > self.price_btc.index[-1]:
@@ -157,7 +157,7 @@ class QuantoProfitSystemExponential(QuantoSystemEmpty):
 
         volume = 1 / (self.price_btc_p * 0.000001)
         # profit theoretical entry theoretical of the Quanto profit
-        if not(self.exp_entry_theoretical is None and pd.isna(self.exp_entry_theoretical)):
+        if not (self.exp_entry_theoretical is None and pd.isna(self.exp_entry_theoretical)):
             entry_quanto_profit_theoretical = quanto_pnl_func_exp(avg_price_eth=self.price_eth_p,
                                                                   price_eth=self.price_eth_t,
                                                                   avg_price_btc=self.price_btc_p,
@@ -193,12 +193,12 @@ class QuantoProfitSystemExponential(QuantoSystemEmpty):
         # The exit band adjustment for the exit theoretical.
         if not (self.exp_exit_theoretical is None or pd.isna(self.exp_exit_theoretical)):
             exit_band_adjustment = quanto_pnl_func_exp(avg_price_eth=self.price_eth_p2,
-                                                                 price_eth=self.price_eth_t,
-                                                                 avg_price_btc=self.price_btc_p2,
-                                                                 price_btc=self.price_btc_t,
-                                                                 coin_volume=volume,
-                                                                 exp1=self.exp_exit_theoretical,
-                                                                 exp2=self.exp_exit_theoretical)
+                                                       price_eth=self.price_eth_t,
+                                                       avg_price_btc=self.price_btc_p2,
+                                                       price_btc=self.price_btc_t,
+                                                       coin_volume=volume,
+                                                       exp1=self.exp_exit_theoretical,
+                                                       exp2=self.exp_exit_theoretical)
         else:
             exit_band_adjustment = 0
 

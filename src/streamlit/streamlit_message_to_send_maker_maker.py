@@ -1,8 +1,9 @@
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
+
+from src.common.constants.constants import exchange_fees, set_latencies_auto
 from src.common.queries.queries import get_strategy_families, get_symbol, get_strategy_influx, get_exhange_names
 from src.common.clients.rpc_client import RpcClient
-from src.simulations.simulation_codebase.latencies_fees.latencies_fees import set_latencies_auto, exchange_fees
 import datetime
 
 

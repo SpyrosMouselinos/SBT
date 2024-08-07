@@ -11,7 +11,7 @@ from src.simulations.simulation_codebase.execute_simulations.simulation_maker_ta
 
 functions = {'simulation_trader': simulation_trader
              # 'simulation_trader_maker_maker': simulation_trader_maker_maker
-}
+             }
 
 
 class TakerMakerWorker:
@@ -72,7 +72,6 @@ class TakerMakerWorker:
             pass
 
 
-
 if __name__ == '__main__':
     worker = TakerMakerWorker()
     # body = {
@@ -121,4 +120,3 @@ if __name__ == '__main__':
 
     print(" [x] Awaiting RPC requests")
     worker.channel.start_consuming()
-

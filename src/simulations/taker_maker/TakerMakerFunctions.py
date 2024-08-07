@@ -1,18 +1,14 @@
 import numba
 import pandas as pd
-import time
 from src.common.utils.quanto_utils import quanto_pnl_func
 from src.common.utils.utils import bp_to_dollars
 from src.common.connections.DatabaseConnections import InfluxConnection
 import numpy as np
-from src.common.queries.queries import get_price, get_band_values, get_percentage_band_values, Takers, \
-    funding_values_mark_to_market
+from src.common.queries.queries import Takers
 
 from pytictoc import TicToc
 
 import warnings
-
-from src.common.equinox_api_call import DatalinkCreateBands
 
 warnings.filterwarnings("ignore")
 t = TicToc()
@@ -304,7 +300,7 @@ class TakerMakerFunctions(object):
         if self.temporary_order_swap is not None:
             if self.verbose:
                 band = self.df.loc[self.timestamp]["Entry Band"] if self.side == 'entry' else \
-                self.df.loc[self.timestamp]["Exit Band"]
+                    self.df.loc[self.timestamp]["Exit Band"]
                 print(
                     f"Time: {self.df.Time.loc[self.timestamp]}\t Posted swap. Side: {self.side}\t Order id {self.temporary_order_swap.id}\t Order spread {self.temporary_order_swap.targeted_spread}\t Order price {self.temporary_order_swap.price}\tAdded at {self.temporary_order_swap.timestamp_posted}\t Index {self.df.index.get_loc(self.temporary_order_swap.timestamp_posted)}\t Band {band}")
             self.limit_orders_swap.append(self.temporary_order_swap)
@@ -1064,7 +1060,7 @@ class TakerMakerFunctions(object):
         # print(f"Time: {self.df.Time.loc[self.timestamp]}\tCentral band: {self.df.loc[self.timestamp, 'Central Band']}\tPrice spot ask: {self.df.price_swap_ask.loc[self.timestamp]}\tPrice spot ask:{self.df.price_spot_exit.loc[self.timestamp]}\tPrice swap bid:{self.df.price_swap_bid.loc[self.timestamp]}\tPrice spot bid:{self.df.price_spot_entry.loc[self.timestamp]}")
 
         assert self.limit_orders_swap[0].timestamp_executed > self.limit_orders_swap[
-             0].timestamp_posted, f"Something is wrong. Found order executed before posted. Timestamp posted {self.limit_orders_swap[0].timestamp_posted}"
+            0].timestamp_posted, f"Something is wrong. Found order executed before posted. Timestamp posted {self.limit_orders_swap[0].timestamp_posted}"
         execution_swap = self.limit_orders_swap[0]
         targeted_spread = self.limit_orders_swap[0].targeted_spread
         if self.side == 'entry':
@@ -1178,224 +1174,6 @@ def get_taker_trades(t0, t1, swapMarket, swapSymbol):
         return swap_takers_querier.query_data(t0, t1).get_data(t0, t1)
     except KeyError:
         return pd.DataFrame(columns=['side'])
-
-
-# @st.experimental_singleton
-def get_data_for_trader(t_start, t_end, exchange_spot, spot_instrument, exchange_swap, swap_instrument, swap_fee,
-                        spot_fee, strategy, area_spread_threshold, environment, band_type,
-                        window_size=None, exit_delta_spread=None, entry_delta_spread=None,
-                        band_funding_system=None, funding_window=90, generate_percentage_bands=False,
-                        lookback=None, recomputation_time=None, target_percentage_exit=None,
-                        target_percentage_entry=None, entry_opportunity_source=None, exit_opportunity_source=None,
-                        minimum_target=None, use_aggregated_opportunity_points=None, ending=None,
-                        force_band_creation=False, move_bogdan_band='No'):
-    """
-    Retrieves and processes data for a trading strategy.
-
-    This function gathers and processes price and band data for the specified trading strategy and parameters.
-
-    @param t_start: The start time for data retrieval.
-    @param t_end: The end time for data retrieval.
-    @param exchange_spot: The spot exchange to retrieve data from.
-    @param spot_instrument: The spot instrument symbol.
-    @param exchange_swap: The swap exchange to retrieve data from.
-    @param swap_instrument: The swap instrument symbol.
-    @param swap_fee: The fee for the swap exchange.
-    @param spot_fee: The fee for the spot exchange.
-    @param strategy: The trading strategy to use.
-    @param area_spread_threshold: The threshold for area spread.
-    @param environment: The trading environment (e.g., production, staging).
-    @param band_type: The type of band to use (e.g., percentage_band, bogdan_bands).
-    @param window_size: The window size for band computation (optional).
-    @param exit_delta_spread: The delta spread for exiting trades (optional).
-    @param entry_delta_spread: The delta spread for entering trades (optional).
-    @param band_funding_system: The funding system for bands (optional).
-    @param funding_window: The funding window for band computation.
-    @param generate_percentage_bands: A boolean indicating whether to generate percentage bands.
-    @param lookback: The lookback period for band computation (optional).
-    @param recomputation_time: The recomputation time for bands (optional).
-    @param target_percentage_exit: The target percentage for exiting trades (optional).
-    @param target_percentage_entry: The target percentage for entering trades (optional).
-    @param entry_opportunity_source: The source of entry opportunities (optional).
-    @param exit_opportunity_source: The source of exit opportunities (optional).
-    @param minimum_target: The minimum target for trades (optional).
-    @param use_aggregated_opportunity_points: A boolean indicating whether to use aggregated opportunity points.
-    @param ending: The ending condition for band generation (optional).
-    @param force_band_creation: A boolean indicating whether to force band creation.
-    @param move_bogdan_band: The condition for moving Bogdan bands (optional).
-
-    @return: A tuple containing the processed DataFrame and the strategy name.
-    """
-    price1 = get_price(t_start=t_start, t_end=t_end, exchange=exchange_spot, symbol=spot_instrument, side='Ask',
-                       environment=environment)
-
-    price2 = get_price(t_start=t_start, t_end=t_end, exchange=exchange_swap, symbol=swap_instrument, side='Ask',
-                       environment=environment)
-
-    price1['Time'] = price1.index
-
-    price2['Time'] = price2.index
-
-    # merge the price dataframes
-    price_ask = pd.merge_ordered(price1, price2, on='Time', suffixes=['_spot_entry', '_swap_entry'])
-
-    price3 = get_price(t_start=t_start, t_end=t_end, exchange=exchange_spot, symbol=spot_instrument, side='Bid',
-                       environment=environment)
-
-    price4 = get_price(t_start=t_start, t_end=t_end, exchange=exchange_swap, symbol=swap_instrument, side='Bid',
-                       environment=environment)
-
-    price3['Time'] = price3.index
-    price4['Time'] = price4.index
-    price_bid = pd.merge_ordered(price3, price4, on='Time', suffixes=['_spot_exit', '_swap_exit'])
-
-    df_price = pd.merge_ordered(price_ask, price_bid, on='Time')
-    df_price['price_spot_mid'] = (df_price['price_spot_entry'] + df_price['price_spot_exit']) / 2
-
-    # get the band values of the selected strategy
-    if band_type == 'percentage_band':
-        band_values = get_percentage_band_values(t0=t_start, t1=t_end,
-                                                 lookback=lookback,
-                                                 recomputation_time=recomputation_time,
-                                                 target_percentage_exit=target_percentage_exit,
-                                                 target_percentage_entry=target_percentage_entry,
-                                                 entry_opportunity_source=entry_opportunity_source,
-                                                 exit_opportunity_source=exit_opportunity_source,
-                                                 spot_name=exchange_spot,
-                                                 spot_instrument=f"hybrid_{spot_instrument}",
-                                                 swap_instrument=f"hybrid_{swap_instrument}",
-                                                 environment=environment)
-        band_values.rename(columns={'entry_band': 'Entry Band', 'exit_band': 'Exit Band'}, inplace=True)
-    elif band_type == 'bogdan_bands':
-        if force_band_creation or strategy == '':
-            datalink = DatalinkCreateBands(t_start=t_start - 1000 * 60 * (window_size + 10), t_end=t_end,
-                                           swap_exchange=exchange_swap, swap_symbol=swap_instrument,
-                                           spot_exchange=exchange_spot, spot_symbol=spot_instrument,
-                                           window_size=window_size, entry_delta_spread=entry_delta_spread,
-                                           exit_delta_spread=exit_delta_spread, swap_fee=swap_fee, spot_fee=spot_fee,
-                                           generate_percentage_bands=generate_percentage_bands,
-                                           funding_system=band_funding_system, funding_window=funding_window,
-                                           environment=environment, recomputation_time=recomputation_time,
-                                           entry_opportunity_source=entry_opportunity_source,
-                                           exit_opportunity_source=exit_opportunity_source,
-                                           target_percentage_entry=target_percentage_entry,
-                                           target_percentage_exit=target_percentage_exit, lookback=lookback,
-                                           minimum_target=minimum_target,
-                                           use_aggregated_opportunity_points=use_aggregated_opportunity_points,
-                                           ending=ending)
-            datalink.generate_bogdan_bands()
-            time.sleep(5)
-            band_values = get_band_values(t0=t_start, t1=t_end, typeb='bogdan_bands',
-                                          strategy=datalink.strategy_name, environment=environment)
-        else:
-            band_values = get_band_values(t0=t_start, t1=t_end, typeb=band_type,
-                                          strategy=strategy, environment=environment)
-
-    elif band_type == 'custom_multi' or band_type == 'custom_multi_symmetrical' or band_type == 'custom_multi_custom':
-
-        datalink = DatalinkCreateBands(t_start=t_start - 1000 * 60 * (window_size + 10), t_end=t_end,
-                                       swap_exchange=exchange_swap, swap_symbol=swap_instrument,
-                                       spot_exchange=exchange_spot, spot_symbol=spot_instrument,
-                                       window_size=window_size, entry_delta_spread=entry_delta_spread,
-                                       exit_delta_spread=exit_delta_spread, swap_fee=swap_fee, spot_fee=spot_fee,
-                                       generate_percentage_bands=generate_percentage_bands,
-                                       funding_system=band_funding_system, funding_window=funding_window,
-                                       environment=environment, recomputation_time=recomputation_time,
-                                       entry_opportunity_source=entry_opportunity_source,
-                                       exit_opportunity_source=exit_opportunity_source,
-                                       target_percentage_entry=target_percentage_entry,
-                                       target_percentage_exit=target_percentage_exit, lookback=lookback,
-                                       minimum_target=minimum_target,
-                                       use_aggregated_opportunity_points=use_aggregated_opportunity_points,
-                                       ending=ending)
-        if force_band_creation:
-            datalink.generate_bogdan_bands()
-            time.sleep(5)
-
-        band_values = get_band_values(t0=t_start, t1=t_end, typeb='bogdan_bands',
-                                      strategy=datalink.strategy_name, environment=environment)
-
-        try:
-            isinstance(band_values, type(None))
-            datalink.generate_bogdan_bands()
-            time.sleep(5)
-        except:
-            if band_values.empty:
-                datalink.generate_bogdan_bands()
-                time.sleep(5)
-                band_values = get_band_values(t0=t_start, t1=t_end, typeb='bogdan_bands',
-                                              strategy=datalink.strategy_name, environment=environment)
-            elif band_values.iloc[:100, :].dropna().empty or band_values.iloc[100:, :].dropna().empty:
-                datalink.generate_bogdan_bands()
-                time.sleep(5)
-                band_values = get_band_values(t0=t_start, t1=t_end, typeb='bogdan_bands',
-                                              strategy=datalink.strategy_name, environment=environment)
-
-    # add the deribit funding to the band
-    if move_bogdan_band != 'No' and exchange_spot == 'Deribit' and (spot_instrument == 'ETH-PERPETUAL' or
-                                                                    spot_instrument == 'BTC-PERPETUAL'):
-        deribit_funding = funding_values_mark_to_market(t0=t_start, t1=t_end, exchange=exchange_spot,
-                                                        symbol=spot_instrument, environment=environment)
-        deribit_funding['funding'] = deribit_funding['funding'] / (8 * 3600)
-        deribit_funding['rolling_funding'] = deribit_funding['funding'].rolling('8h').mean()
-        # deribit_funding['percentual_change'] = (deribit_funding['rolling_funding'] - deribit_funding['funding']) / deribit_funding['funding'] * 100
-        deribit_funding['Time'] = deribit_funding.index
-        deribit_funding.reset_index(drop=True, inplace=True)
-        band_values = pd.merge_ordered(band_values, deribit_funding, on='Time')
-        band_values['Entry Band'].ffill(inplace=True)
-        band_values['Exit Band'].ffill(inplace=True)
-        band_values['funding'].ffill(inplace=True)
-        band_values['rolling_funding'].fillna(0, inplace=True)
-        # take the mid price for deribit
-        if move_bogdan_band == 'move_entry':
-            band_values['Entry Band Old'] = band_values['Entry Band']
-            band_values['Entry Band'] = band_values['Entry Band Old'] + band_values['Entry Band Old'] * \
-                                        band_values['rolling_funding']
-
-        elif move_bogdan_band == 'move_both':
-            band_values['Entry Band Old'] = band_values['Entry Band']
-            band_values['Exit Band Old'] = band_values['Exit Band']
-            band_values['Entry Band'] = band_values['Entry Band Old'] + band_values['Entry Band Old'] * \
-                                        band_values['rolling_funding']
-            band_values['Exit Band'] = band_values['Exit Band Old'] + band_values['Exit Band Old'] * \
-                                       band_values['rolling_funding']
-
-    # merge all dataframes in to a new one containing all values.
-    df = pd.merge_ordered(band_values, df_price, on='Time')
-    df['Entry Band'].ffill(inplace=True)
-    df['Exit Band'].ffill(inplace=True)
-    df.price_spot_entry.ffill(inplace=True)
-    df.price_swap_entry.ffill(inplace=True)
-    df.price_spot_exit.ffill(inplace=True)
-    df.price_swap_exit.ffill(inplace=True)
-    df.dropna(inplace=True)
-    df['timems'] = df.Time.view(np.int64) // 10 ** 6
-    df.set_index('timems', drop=False, inplace=True)
-
-    df.drop_duplicates(subset=['timems'], keep='last', inplace=True)
-
-    df['entry_area_spread'] = 0
-    df['exit_area_spread'] = 0
-
-    df['spread_entry'] = get_spread_entry(df['price_swap_entry'], df['price_spot_entry'], swap_fee=swap_fee,
-                                          spot_fee=spot_fee)
-    df['spread_exit'] = get_spread_exit(df['price_swap_exit'], df['price_spot_exit'], swap_fee=swap_fee,
-                                        spot_fee=spot_fee)
-    if area_spread_threshold != 0:
-        df['multiplier'] = df['timems'].diff() // 100
-
-        df_mat = df.loc[:, ['spread_entry', 'spread_exit', 'Entry Band', 'Exit Band', 'multiplier', 'entry_area_spread',
-                            'exit_area_spread']].to_numpy()
-
-        df_mat = df_numba(df_mat)
-
-        df['entry_area_spread'] = df_mat[:, 5]
-        df['exit_area_spread'] = df_mat[:, 6]
-    if band_type == 'custom_multi' or band_type == 'custom_multi_symmetrical' or band_type == 'custom_multi_custom' or \
-            strategy == '':
-        return df, datalink.strategy_name
-    else:
-        return df, None
 
 
 @numba.jit(nopython=True)

@@ -47,7 +47,7 @@ def compute_rolling_pnl(funding, executions, funding_system):
         executions_df['quanto_profit'] = executions_df['quanto_profit_entry'].fillna(0)
     elif funding_system == 'Quanto_both':
         qp_df = executions.loc[((executions.side == 'entry') & (executions.trade == 'long')) | (
-                    (executions.side == 'exit') & (executions.trade == 'short')), ['timems', 'quanto_profit']]
+                (executions.side == 'exit') & (executions.trade == 'short')), ['timems', 'quanto_profit']]
         executions_df = pd.merge_ordered(executions_df, qp_df, on='timems')
 
     if 'quanto_profit' in executions_df.columns:

@@ -1,5 +1,6 @@
 import numba
 
+
 def get_spread_entry(swap_price, spot_price, swap_fee, spot_fee):
     """
     Calculate the spread entry value for maker-maker, balancing, or taker-maker spreads.

@@ -3,7 +3,7 @@ import pandas as pd
 from src.common.clients.backblaze_client import BackblazeClient
 import ssl
 
-from src.common.utils.local_funding import funding_implementation
+from src.common.queries.funding_queries import funding_implementation
 from src.simulations.simulation_codebase.pnl_computation_functions.pnl_computation import compute_rolling_pnl
 
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -80,7 +80,7 @@ def download_simulation_results_from_backbalaze(file_id_download: str = None, da
             funding_system = 'No'
 
         funding_spot, funding_swap, funding_total, spot_funding, swap_funding = \
-            funding_implementation(t0=params_res.loc[0, 't_start'], t1=params_res.loc[0, 't_end'],
+            funding_implementation(t_start=params_res.loc[0, 't_start'], t_end=params_res.loc[0, 't_end'],
                                    swap_exchange=params_res.loc[0, 'exchange_swap'],
                                    swap_symbol=params_res.loc[0, 'swap_instrument'],
                                    spot_exchange=params_res.loc[0, 'exchange_spot'],

@@ -9,6 +9,7 @@ from datetime import timedelta
 warnings.filterwarnings("ignore")
 load_dotenv(find_dotenv())
 
+
 def bitmex_btc_prices(t0, t1, environment, split_data=True):
     """
     Downloads and calculates average prices for BitMEX XBTUSD (Bitcoin) over a specified time interval.

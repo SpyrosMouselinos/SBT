@@ -63,7 +63,6 @@ class QuantoProfitSystem(QuantoSystemEmpty):
             self.quanto_tp_signal['timems'] = self.quanto_tp_signal['end_time'].view(np.int64) // 10 ** 6
             self.quanto_tp_signal['triggered'] = False
 
-
     def update(self, timestamp, position):
         """
          @brief Update the state of the market. This is called every time we are interested in a position ( buy sell etc. )
@@ -95,7 +94,7 @@ class QuantoProfitSystem(QuantoSystemEmpty):
         # This method is used to calculate the price box parameters.
         if self.price_box_params:
             self.price_box_params.idx_p = \
-                self.quanto_tp_signal.loc[self.price_box_params.idx_p:, 'timems'].\
+                self.quanto_tp_signal.loc[self.price_box_params.idx_p:, 'timems']. \
                     searchsorted(timestamp, side='left') + self.price_box_params.idx_p
 
             # If the price box signal is greater than the quanto_tp_signal. index 1 this. quanto_tp_signal. index 1
@@ -106,7 +105,7 @@ class QuantoProfitSystem(QuantoSystemEmpty):
             if self.quanto_tp_signal.iloc[self.price_box_params.idx_p].signal > self.price_box_params.upper_threshold:
                 self.price_box_params.upper_threshold_crossed = True
             # If the quanto_tp_signal is less than the lower threshold the lower threshold is crossed.
-            if self.price_box_params.upper_threshold_crossed and self.quanto_tp_signal.\
+            if self.price_box_params.upper_threshold_crossed and self.quanto_tp_signal. \
                     iloc[self.price_box_params.idx_p].signal < self.price_box_params.lower_threshold:
                 self.price_box_params.lower_threshold_crossed = True
                 self.price_box_params.upper_threshold_crossed = False
@@ -219,7 +218,7 @@ class QuantoProfitSystem(QuantoSystemEmpty):
                 # Calculate the movement between entry and exit band
                 if abs(self.last_entry_band_adjustment) > 0.05:
                     movement_to_entry = - (entry_band + self.last_entry_band_adjustment - exit_band
-                                       - self.minimum_distance)
+                                           - self.minimum_distance)
                     movement_exit = max(movement_exit + self.minimum_distance, movement_to_entry)
             else:
                 movement_exit = 0

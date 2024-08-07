@@ -4,10 +4,13 @@ import argparse
 from src.scripts.wandb_sweeps.process_sweep_results.download_wandb_results import AutomateParameterSelectionEthusd, \
     AutomateParameterSelectionXbtusd
 from dotenv import find_dotenv, load_dotenv
+
 load_dotenv(find_dotenv())
+
 
 def list_of_strings(arg):
     return arg.split(',')
+
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--strategy_family', default='ETHUSD', type=str)
@@ -20,7 +23,6 @@ if params['strategy_family'] == 'ETHUSD':
     data_processing = AutomateParameterSelectionEthusd(project_name=params['project_name'])
 elif params['strategy_family'] == 'XBTUSD':
     data_processing = AutomateParameterSelectionXbtusd(project_name=params['project_name'])
-
 
 df = data_processing.combine_results_to_single_df(sweep_id_confirm=params['sweep_id_confirmations'],
                                                   sweep_id_training=params['sweep_id_training'])

@@ -12,12 +12,13 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 import datetime
 from dotenv import load_dotenv, find_dotenv
+
 load_dotenv(find_dotenv())
 
 
 # Creates a BackblazeClient to interact with the server. It is up to the caller to ensure that the client is ready
 class BackblazeClient:
-    
+
     def __init__(self):
         """
          @brief Initialize class variables and set default values. This is called by __init__
@@ -321,11 +322,11 @@ class BackblazeClient:
         return b2
 
     def get_simulations_by_name_and_date(self,
-                                bucket,
-                                b2,
-                                prefix="",
-                                time_from=datetime.datetime.strptime("01/01/22 09:55:00", '%d/%m/%y %H:%M:%S'),
-                                time_to=datetime.datetime.strptime("31/12/22 10:40:00", '%d/%m/%y %H:%M:%S')):
+                                         bucket,
+                                         b2,
+                                         prefix="",
+                                         time_from=datetime.datetime.strptime("01/01/22 09:55:00", '%d/%m/%y %H:%M:%S'),
+                                         time_to=datetime.datetime.strptime("31/12/22 10:40:00", '%d/%m/%y %H:%M:%S')):
         """
         @brief Get simulations by name and date. This method is used to get all simulations that match the prefix and have a name and date in the time range
         @param bucket The bucket to use for the query
@@ -395,8 +396,6 @@ class BackblazeClient:
         except ClientError as ce:
             print('error', ce)
 
-
-
     def delete_simulations_by_date_using_api(self,
                                              bucket,
                                              b2,
@@ -409,7 +408,8 @@ class BackblazeClient:
             start_file_name = "simulations/.bzEmpty"
             # simulations/XMfSwVYvM8jJUkJWVi1o9CIq_Parameters_MT__from_12-03-2022_to_01-14-2023_id_XMfSwVYvM8jJUkJWVi1o9CIq 4_z77cad1c597fab2c6722b0116_f10190ccdb446acae_d20230304_m004900_c002_v0001127_t0034_u01677890940614
             # start_file_name = "simulations/.bzEmpty"
-            files = self.list_file_versions(start_file_id=start_file_id, start_file_name=start_file_name, prefix="simulations/")
+            files = self.list_file_versions(start_file_id=start_file_id, start_file_name=start_file_name,
+                                            prefix="simulations/")
             count = 0
             deleted = 0
             while len(files) > 2:
@@ -419,7 +419,7 @@ class BackblazeClient:
                     # compare dates  
                     print(file["fileName"], file["fileId"])
                     if time_from.timestamp() * 1000 < file["uploadTimestamp"] < time_to.timestamp() * 1000:
-                            # and "ETHUSD" not in file["fileName"]:
+                        # and "ETHUSD" not in file["fileName"]:
 
                         self.delete_simulation(file["fileName"], file["fileId"])
                         time.sleep(0.5)
@@ -439,11 +439,10 @@ class BackblazeClient:
                 start_file_name = files[-1]["fileName"]
                 print(f"Total files parsed {count}, deleted {deleted}")
                 time.sleep(2)
-                files = self.list_file_versions(start_file_id=start_file_id, start_file_name=start_file_name, prefix="simulations/")
+                files = self.list_file_versions(start_file_id=start_file_id, start_file_name=start_file_name,
+                                                prefix="simulations/")
 
             return files
 
         except ClientError as ce:
             print('error', ce)
-
-

@@ -582,6 +582,7 @@ class BackfillFundingFTX(BackfillFunding):
 
         print(f"Backfill for exchange {self.exchange} and symbol {symbol} successfully ended")
 
+
 class BackfillFundingHuobi(BackfillFunding):
     """A class for backfilling funding rates from Huobi DM Swap into an InfluxDB database."""
 
@@ -1366,7 +1367,7 @@ class BackfillQuotesBitMEX:
                     f'Inserted to influx: {len(points_to_write)} points. From {datetime.fromtimestamp(points_to_write[0]["time"] / 1000)} to {datetime.fromtimestamp(points_to_write[-1]["time"] / 1000)}')
                 if datetime.fromtimestamp(points_to_write[-1]["time"] / 1000) > datetime.strptime(start_time,
                                                                                                   '%Y-%m-%dT%H:%M:%S.%fZ') + timedelta(
-                        days=1, hours=3):
+                    days=1, hours=3):
                     print(datetime.fromtimestamp(points_to_write[-1]["time"] / 1000),
                           datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S.%fZ') + timedelta(days=1, hours=3))
                     new_time = datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S.%fZ') + timedelta(days=1)
@@ -1456,6 +1457,7 @@ class BackfillQuotesBitMEX:
                 points_to_write = []
 
             os.remove(f"quotes_download/{date}.csv.gz")
+
 
 class BackfillTradesBitMEX:
     """

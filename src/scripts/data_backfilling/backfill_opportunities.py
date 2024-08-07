@@ -468,7 +468,7 @@ class BackfillOpportunityPointsBps:
         existing_opportunity_points = existing_opportunity_points.reset_index()
         if self.skip_already_filled and len(
                 existing_opportunity_points.loc[existing_opportunity_points['count'] == 0]) == 0 and len(
-                existing_opportunity_points) > 0:
+            existing_opportunity_points) > 0:
             print(f"Combination {self.swapSymbol}/{self.spotSymbol} already fully backfilled.")
             return
 
@@ -586,6 +586,7 @@ class BackfillOpportunityPointsBps:
         elif self.server == 'staging':
             self.influx_connection.staging_client_spotswap.write_points(points, time_precision='ms')
             time.sleep(5)
+
 
 class BackfillOpportunityPointsBpsFunding:
     """
@@ -757,7 +758,7 @@ class BackfillOpportunityPointsBpsFunding:
             funding_diff = (swap_funding - spot_funding) * 10000
             spot_price = spot_prices_ask.iloc[spot_price_index]['price']
             spread = (swap_price * (1 - self.swapFee) - (
-                        spot_price + spot_price * self.spotFee)) / swap_price * 10000 + funding_diff
+                    spot_price + spot_price * self.spotFee)) / swap_price * 10000 + funding_diff
 
             point = {
                 'time': int(row['timems']),
@@ -807,7 +808,7 @@ class BackfillOpportunityPointsBpsFunding:
             funding_diff = (swap_funding - spot_funding) * 10000
             spot_price = spot_prices_bid.iloc[spot_price_index]['price']
             spread = (swap_price * (1 + self.swapFee) - (
-                        spot_price - spot_price * self.spotFee)) / swap_price * 10000 + funding_diff
+                    spot_price - spot_price * self.spotFee)) / swap_price * 10000 + funding_diff
 
             point = {
                 'time': int(row['timems']),
@@ -1208,7 +1209,7 @@ class BackfillMakerMakerOpportunityPoints:
                     idx, ['exit_price_swap', 'volume', 'agr_volume']]
                 exit_maker_ask.loc[idx, ['exit_price_swap', 'volume', 'agr_volume']] = temp
         exit_maker_ask['exit_price_swap'].ffill(inplace=True)
-        
+
         # Forward fill aggregated volume for missing values in exit_maker_ask
         for ix in range(1, len(exit_maker_ask) - 1):
             if (exit_maker_ask.loc[ix - 1, 'exit_price_swap'] == exit_maker_ask.loc[ix, 'exit_price_swap']) & \
@@ -1520,7 +1521,7 @@ class BackfillMakerMakerOpportunityPoints:
         ################################################################################################################
         # 3.Compute the entry opportunity points
         ################################################################################################################
-        
+
         points = []
 
         ix = 1
@@ -1616,7 +1617,7 @@ class BackfillMakerMakerOpportunityPoints:
         exit_maker_ask = pd.merge_ordered(price_swap[['Time', 'exit_price_swap']], bitmex_ask,
                                           on=['Time', 'exit_price_swap'])
         exit_maker_ask['exit_price_swap'].ffill(inplace=True)
-        
+
         # Swap aggregated volume and price for entries with identical timestamps
         for idx in exit_maker_ask.dropna(subset=['volume']).index:
             if idx == 0:

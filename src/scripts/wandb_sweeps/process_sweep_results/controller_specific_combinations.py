@@ -9,8 +9,9 @@ from src.scripts.wandb_sweeps.process_sweep_results.mapping_simulations_real_res
     mapping_real_params_to_simulation_params, params_for_xbtusd, params_for_ethusd_short_go_long, \
     params_ethusd_combined_results, params_xbtusd_combined_results, params_for_btc_deribit_maker, \
     params_btc_deribit_maker_combined_results
-from src.simulations.simulations_management import sweep_rerun_simulations
 import pandas as pd
+
+from src.simulations.simulations_management.download_sweep_results import sweep_rerun_simulations
 
 load_dotenv(find_dotenv())
 

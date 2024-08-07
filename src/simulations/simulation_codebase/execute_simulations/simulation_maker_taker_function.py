@@ -540,7 +540,7 @@ def simulation_trader(params):
     rate_limit_df = pd.DataFrame(rate_limit_list, columns=['timestamp', 'counter', 'condition_state', 'second_limit',
                                                            'minute_limit'])
     # funding system should
-    funding_spot, funding_swap, funding_total, spot_df, swap_df = funding_implementation(t0=t_start, t1=t_end,
+    funding_spot, funding_swap, funding_total, spot_df, swap_df = funding_implementation(t_start=t_start, t_end=t_end,
                                                                                          swap_exchange=exchange_swap,
                                                                                          swap_symbol=swap_instrument,
                                                                                          spot_exchange=exchange_spot,

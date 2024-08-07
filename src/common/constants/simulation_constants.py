@@ -116,7 +116,6 @@ SYMBOL_PROGRAM = {
 
 CONTROLLER_CONFS = [CONTROLLER_A_CONF, CONTROLLER_B_CONF, CONTROLLER_C_CONF, CONTROLLER_D_CONF]
 
-
 HOSTS = [
     "simulations-dedicated-17", "simulations-dedicated-18"
 ]

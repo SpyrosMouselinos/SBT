@@ -8,13 +8,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
 from src.common.connections.DatabaseConnections import InfluxConnection
+from src.common.queries.funding_queries import funding_implementation
 from src.common.queries.queries import Prices, Takers, get_percentage_band_values, get_band_values, \
     get_opportunity_points_all
 from src.common.utils.quanto_utils import bitmex_eth_prices, bitmex_btc_prices
 from src.common.utils.utils import sharpe_sortino_ratio_fun
 from src.scripts.data_backfilling.backfill_opportunities import BackfillOpportunityPoints
-from src.simulations.simulation_codebase.local_funding.funding_aggregated_function_implementation import \
-    funding_implementation
 from src.simulations.simulation_codebase.pnl_computation_functions.pnl_computation import \
     compute_rolling_pnl
 from src.common.clients.backblaze_client import BackblazeClient
@@ -377,7 +376,7 @@ def report_generator_maker_taker_multicoin():
 
                 # funding report
                 funding_spot, funding_swap, funding_total, spot_funding, swap_funding = funding_implementation(
-                    t0=t_start, t1=t_end,
+                    t_start=t_start, t_end=t_end,
                     swap_exchange=exchange_swap,
                     swap_symbol=swap_instrument,
                     spot_exchange=exchange_spot,

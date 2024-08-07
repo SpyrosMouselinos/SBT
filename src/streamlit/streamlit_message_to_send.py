@@ -4,13 +4,13 @@ import time
 import numpy as np
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
+
+from src.common.constants.constants import exchange_fees, set_latencies_auto, exchange_tick_size
 from src.common.queries.queries import get_strategy_families, get_symbol, get_strategy_influx, get_exhange_names
 from src.common.clients.rpc_client import RpcClient
-from src.simulations.simulations_management import sweep_rerun_simulations
-from src.simulations.simulation_codebase.latencies_fees.latencies_fees import set_latencies_auto, \
-    exchange_fees, exchange_tick_size
 from src.simulations.simulation_codebase.execute_simulations.simulation_maker_taker_function import \
     simulation_trader
+from src.simulations.simulations_management.download_sweep_results import sweep_rerun_simulations
 
 load_dotenv(find_dotenv())
 

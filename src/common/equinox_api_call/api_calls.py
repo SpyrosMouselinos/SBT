@@ -12,10 +12,6 @@ load_dotenv(find_dotenv())
 
 
 class DatalinkCreateBands:
-    '''
-    class to connect with equinox api and create bands and spreads
-    '''
-
     def __init__(self, t_start: int, t_end: int,
                  swap_exchange: str,
                  swap_symbol: str,

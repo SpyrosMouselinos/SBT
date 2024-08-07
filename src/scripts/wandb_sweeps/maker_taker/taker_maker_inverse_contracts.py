@@ -1,11 +1,9 @@
+from src.common.constants.constants import exchange_fees, set_latencies_auto
 from src.common.utils.utils import parse_args, values_to_list
 import argparse
 import numpy as np
 
 from src.simulations.simulation_codebase.core_code.base_new import TraderExpectedExecutions
-
-from src.simulations.simulation_codebase.latencies_fees.latencies_fees import exchange_fees, \
-    set_latencies_auto
 from src.simulations.simulation_codebase.execute_simulations.simulation_maker_taker_function import \
     simulation_trader, upload_to_backblaze, \
     upload_to_wandb

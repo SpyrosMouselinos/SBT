@@ -102,9 +102,9 @@ def simulation_trader_taker_maker_at_depth(params):
         "message": f"Simulation (TM) of {strategy} from {date_start} to {date_end} Started at {dt_string_start} UTC",
     }
 
-    band_values = get_entry_exit_bands(t0=t_start, t1=t_end, strategy=strategy, entry_delta_spread=entry_delta_spread,
-                                       exit_delta_spread=exit_delta_spread, btype='central_band',
-                                       environment=environment)
+    band_values = get_entry_exit_bands(t_start=t_start, t_end=t_end, strategy=strategy,
+                                       entry_delta_spread=entry_delta_spread, exit_delta_spread=exit_delta_spread,
+                                       btype='central_band', environment=environment)
     band_values.rename(columns={'Band': 'Central Band'}, inplace=True)
 
     df, _ = get_data_for_trader(t_start, t_end, exchange_spot=exchange_spot, spot_instrument=instrument_spot,

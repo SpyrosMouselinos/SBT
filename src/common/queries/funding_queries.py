@@ -1,4 +1,3 @@
-### CODE:
 import os
 from dataclasses import dataclass
 from datetime import time
@@ -608,7 +607,7 @@ class FundingSystemDeribitBitMEXWithRatios:
         @return The calculated entry band adjustment to zero.
         """
         return 10000 * (
-            self.funding_spot.get_next_funding_to_zero_entry() + self.funding_swap.get_next_funding_to_zero_entry())
+                self.funding_spot.get_next_funding_to_zero_entry() + self.funding_swap.get_next_funding_to_zero_entry())
 
     def exit_band_adjustment_to_zero(self):
         """
@@ -619,7 +618,7 @@ class FundingSystemDeribitBitMEXWithRatios:
         @return The calculated exit band adjustment to zero.
         """
         return 10000 * (
-            self.funding_spot.get_next_funding_to_zero_exit() + self.funding_swap.get_next_funding_to_zero_exit())
+                self.funding_spot.get_next_funding_to_zero_exit() + self.funding_swap.get_next_funding_to_zero_exit())
 
 
 class FundingSystemOkxBinanceDiscounted:
@@ -796,7 +795,7 @@ class FundingSystemOkxBinanceDiscoutedWithRatios(FundingSystemOkxBinanceDiscount
         @return The calculated entry band adjustment to zero.
         """
         return 10000 * (
-            self.funding_spot.get_next_funding_to_zero_entry() + self.funding_swap.get_next_funding_to_zero_entry())
+                self.funding_spot.get_next_funding_to_zero_entry() + self.funding_swap.get_next_funding_to_zero_entry())
 
     def exit_band_adjustment_to_zero(self):
         """
@@ -807,7 +806,7 @@ class FundingSystemOkxBinanceDiscoutedWithRatios(FundingSystemOkxBinanceDiscount
         @return The calculated exit band adjustment to zero.
         """
         return 10000 * (
-            self.funding_spot.get_next_funding_to_zero_exit() + self.funding_swap.get_next_funding_to_zero_exit())
+                self.funding_spot.get_next_funding_to_zero_exit() + self.funding_swap.get_next_funding_to_zero_exit())
 
 
 class FundingSystemOkxBinanceDiscoutedWithRatiosOnDiff(FundingSystemOkxBinanceDiscoutedWithRatios):
@@ -875,7 +874,6 @@ class FundingSystemOkxBinanceDiscoutedWithRatiosModel(FundingSystemOkxBinanceDis
     # What is needed? move each band up or down. There are 4 bands instead of 2 (entry/exit in position and
     # entry/exit not in position). There are 8 parameters, 2 per band, as each band can move up or down.
     # There are two additional cases
-
 
 
 funding_systems = {"okx_binance_discounted": FundingSystemOkxBinanceDiscounted,
@@ -1032,8 +1030,8 @@ def get_real_time_funding_local(t0: int = 0, t1: int = 0, market: str = 'Deribit
         return pd.DataFrame(columns=['funding'])
 
 
-def funding_implementation(t0: int = 0,
-                           t1: int = 0,
+def funding_implementation(t_start: int = 0,
+                           t_end: int = 0,
                            swap_exchange: str = None,
                            swap_symbol: str = None,
                            spot_exchange: str = None,
@@ -1047,8 +1045,8 @@ def funding_implementation(t0: int = 0,
     and applying it to a given position DataFrame. It handles both continuous and periodical funding
     methods, depending on the exchange type.
 
-    @param t0 The start time in milliseconds for the calculation.
-    @param t1 The end time in milliseconds for the calculation.
+    @param t_start The start time in milliseconds for the calculation.
+    @param t_end The end time in milliseconds for the calculation.
     @param swap_exchange The name of the swap exchange (e.g., 'Deribit').
     @param swap_symbol The trading symbol for the swap exchange.
     @param spot_exchange The name of the spot exchange.
@@ -1070,9 +1068,9 @@ def funding_implementation(t0: int = 0,
 
     try:
         if swap_exchange == 'Deribit':
-            swap_funding = get_real_time_funding_local(t0=t0, t1=t1, market=swap_exchange, symbol=swap_symbol)
+            swap_funding = get_real_time_funding_local(t0=t_start, t1=t_end, market=swap_exchange, symbol=swap_symbol)
         else:
-            swap_funding = funding_values(t0=t0, t1=t1, exchange=swap_exchange, symbol=swap_symbol,
+            swap_funding = funding_values(t0=t_start, t1=t_end, exchange=swap_exchange, symbol=swap_symbol,
                                           environment=environment)
         swap_funding['timems'] = swap_funding.index.view(np.int64) // 10 ** 6
         swap_funding.reset_index(drop=True, inplace=True)
@@ -1086,9 +1084,9 @@ def funding_implementation(t0: int = 0,
 
     try:
         if spot_exchange == 'Deribit':
-            spot_funding = get_real_time_funding_local(t0=t0, t1=t1, market=spot_exchange, symbol=spot_symbol)
+            spot_funding = get_real_time_funding_local(t0=t_start, t1=t_end, market=spot_exchange, symbol=spot_symbol)
         else:
-            spot_funding = funding_values(t0=t0, t1=t1, exchange=spot_exchange, symbol=spot_symbol,
+            spot_funding = funding_values(t0=t_start, t1=t_end, exchange=spot_exchange, symbol=spot_symbol,
                                           environment=environment)
         spot_funding['timems'] = spot_funding.index.view(np.int64) // 10 ** 6
         spot_funding.reset_index(drop=True, inplace=True)
@@ -1121,7 +1119,8 @@ def funding_implementation(t0: int = 0,
             swap_funding = pd.DataFrame(swap_funding_array, columns=swap_funding.columns)
 
         else:
-            swap_funding = periodical_funding_fun(t0=t0, t1=t1, swap_exchange=swap_exchange, swap_symbol=swap_symbol,
+            swap_funding = periodical_funding_fun(t0=t_start, t1=t_end, swap_exchange=swap_exchange,
+                                                  swap_symbol=swap_symbol,
                                                   position_df=position_df, environment=environment, spot=False)
         total_funding_swap = swap_funding['value'].sum()
     else:
@@ -1148,7 +1147,8 @@ def funding_implementation(t0: int = 0,
 
 
         else:
-            spot_funding = periodical_funding_fun(t0=t0, t1=t1, swap_exchange=spot_exchange, swap_symbol=spot_symbol,
+            spot_funding = periodical_funding_fun(t0=t_start, t1=t_end, swap_exchange=spot_exchange,
+                                                  swap_symbol=spot_symbol,
                                                   position_df=position_df, environment=environment, spot=True)
 
         total_funding_spot = spot_funding['value'].sum()

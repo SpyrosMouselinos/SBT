@@ -19,7 +19,7 @@ class QuantoBothExtendedSystem(QuantoSystemEmpty):
     halt_trading_flag = False
 
     def __init__(self, price_btc, price_eth, current_r, high_r, quanto_threshold, distance, high_to_current,
-                 ratio_entry_band_mov,  window, ratio_entry_band_mov_ind, ratio_entry_band_mov_long,  window_long,
+                 ratio_entry_band_mov, window, ratio_entry_band_mov_ind, ratio_entry_band_mov_long, window_long,
                  ratio_exit_band_mov_ind_long):
         """
         @brief Initializes the position. This is the constructor for the Position class. It should be called before the position is added to the list
@@ -65,7 +65,6 @@ class QuantoBothExtendedSystem(QuantoSystemEmpty):
         self.btc_idx_p_long = 0
         self.eth_idx_p_long = 0
 
-
     def update(self, timestamp, position):
         """
          @brief Update the data to account for a new timestamp. This is called every time we have an update in the price_btc and price_eth tables
@@ -73,7 +72,6 @@ class QuantoBothExtendedSystem(QuantoSystemEmpty):
          @param position position of the update in the market_price
         """
         super().update(timestamp, 0)
-
 
         self.btc_idx_p = self.price_btc.loc[self.btc_idx_p:, 'timestamp'].searchsorted(timestamp - 1000 * 60 *
                                                                                        int(self.rolling_time_window_size),
@@ -83,11 +81,11 @@ class QuantoBothExtendedSystem(QuantoSystemEmpty):
                                                                                        side='left') + self.eth_idx_p
 
         self.btc_idx_p_long = self.price_btc.loc[self.btc_idx_p:, 'timestamp'].searchsorted(timestamp - 1000 * 60 *
-                                                                                       int(self.rolling_time_window_size_long),
-                                                                                       side='left') + self.btc_idx_p_long
+                                                                                            int(self.rolling_time_window_size_long),
+                                                                                            side='left') + self.btc_idx_p_long
         self.eth_idx_p_long = self.price_eth.loc[self.eth_idx_p:, 'timestamp'].searchsorted(timestamp - 1000 * 60 *
-                                                                                       int(self.rolling_time_window_size_long),
-                                                                                       side='left') + self.eth_idx_p_long
+                                                                                            int(self.rolling_time_window_size_long),
+                                                                                            side='left') + self.eth_idx_p_long
 
         # Set the price of the btc to the next price.
         if self.btc_idx_p > self.price_btc.index[-1]:
@@ -177,10 +175,10 @@ class QuantoBothExtendedSystem(QuantoSystemEmpty):
 
                 volume = 1 / (self.price_btc_p_long * 0.000001)
                 quanto_prof_exit = quanto_pnl_func(avg_price_eth=self.price_eth_p_long,
-                                                    price_eth=self.price_eth_t,
-                                                    avg_price_btc=self.price_btc_p_long,
-                                                    price_btc=self.price_btc_t,
-                                                    coin_volume=volume)
+                                                   price_eth=self.price_eth_t,
+                                                   avg_price_btc=self.price_btc_p_long,
+                                                   price_btc=self.price_btc_t,
+                                                   coin_volume=volume)
 
                 # print(f'quanto loss in exit_band_adjustment: {quanto_prof_exit}')
                 adjustment = - self.ratio_exit_band_mov_ind_long * quanto_prof_exit

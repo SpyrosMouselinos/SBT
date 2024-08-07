@@ -1,6 +1,7 @@
 import pandas as pd
 from datetime import datetime, timedelta
 
+
 def convert_dates_to_timestamps(t_start, t_end):
     """
     Helper function to convert date range to timestamps in milliseconds.
@@ -62,7 +63,6 @@ class DateRangeIterator:
         - Boolean indicating if more ranges are available.
         """
         return self.current_start < self.end
-
 
 
 if __name__ == '__main__':

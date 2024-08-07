@@ -19,7 +19,7 @@ class QuantoBothSystem(QuantoSystemEmpty):
     halt_trading_flag = False
 
     def __init__(self, price_btc, price_eth, current_r, high_r, quanto_threshold, distance, high_to_current,
-                 ratio_entry_band_mov,  window, ratio_entry_band_mov_ind):
+                 ratio_entry_band_mov, window, ratio_entry_band_mov_ind):
         """
         @brief Initialize the object. This is the method that will be called by the class when it is instantiated.
         @param price_btc The price of the btc price.
@@ -47,7 +47,6 @@ class QuantoBothSystem(QuantoSystemEmpty):
         self.price_eth_p = 0
         self.btc_idx_p = 0
         self.eth_idx_p = 0
-
 
     def update(self, timestamp, position):
         """

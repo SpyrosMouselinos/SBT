@@ -4,6 +4,7 @@ import numpy as np
 from src.common.constants.constants import exchange_fees, set_latencies_auto
 from src.common.utils.utils import parse_args
 
+
 class GenericParser:
     """
     @brief A generic argument parser for configuring trading strategies.
@@ -14,7 +15,7 @@ class GenericParser:
 
     @param description A description for the argument parser. Default is an empty string.
     """
-    
+
     def __init__(self, description=''):
         """
         @brief Initializes the GenericParser with a description and sets up common and specific arguments.

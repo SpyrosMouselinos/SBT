@@ -70,7 +70,7 @@ def params_for_xbtusd(df, band_funding_system: str = None, band_funding_system2:
 
 def params_for_btc_deribit_maker(df, band_funding_system: str = None, band_funding_system2: str = None):
     df = df.loc[(df["strategy"].str.contains("bitmex_perp_deribit_perp_btc")) & (~df["strategy"].str.contains("_t")) & (
-                df.blended == False),
+            df.blended == False),
     ["window_size", "exit_delta_spread", "entry_delta_spread",
      "window_size2", "exit_delta_spread2", "entry_delta_spread2"]]
     if band_funding_system is not None:
